@@ -23,12 +23,8 @@ impl Vec3 {
         Vec3 { x, y, z }
     }
 
-    pub fn dot(self, rhs: Vec3) -> Vec3 {
-        Vec3 {
-            x: self.x * rhs.x,
-            y: self.y * rhs.y,
-            z: self.z + rhs.z,
-        }
+    pub fn dot(self, rhs: Vec3) -> f64 {
+        self.x * rhs.x + self.y * rhs.y + self.z * rhs.z
     }
 
     pub fn cross(self, rhs: Vec3) -> Vec3 {
@@ -48,7 +44,7 @@ impl Vec3 {
     }
 
     fn length_squared(self) -> f64 {
-        self.x * self.x + self.y * self.y * self.z * self.z
+        self.x * self.x + self.y * self.y + self.z * self.z
     }
 }
 
@@ -80,6 +76,18 @@ impl Sub for Vec3 {
             x: self.x - rhs.x,
             y: self.y - rhs.y,
             z: self.z - rhs.z,
+        }
+    }
+}
+
+impl Sub<f64> for Vec3 {
+    type Output = Self;
+
+    fn sub(self, rhs: f64) -> Self::Output {
+        Vec3 {
+            x: self.x - rhs,
+            y: self.y - rhs,
+            z: self.z - rhs,
         }
     }
 }

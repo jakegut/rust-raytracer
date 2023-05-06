@@ -18,9 +18,10 @@ impl Image {
     }
 
     pub fn append_color(&mut self, color: Color) {
-        self.data.push((color.x * 255.999) as u8);
-        self.data.push((color.y * 255.999) as u8);
-        self.data.push((color.z * 255.999) as u8);
+        let c = color * 255.999;
+        self.data.push(c.x as u8);
+        self.data.push(c.y as u8);
+        self.data.push(c.z as u8);
     }
 
     pub fn write(&mut self) {
