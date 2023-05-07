@@ -2,6 +2,7 @@ pub mod camera;
 pub mod hittable;
 pub mod hittable_list;
 pub mod image;
+pub mod material;
 pub mod ray;
 pub mod sphere;
 pub mod utils;
@@ -16,6 +17,7 @@ use ray::Ray;
 use crate::camera::Camera;
 use crate::hittable_list::HittableList;
 use crate::image::Image;
+use crate::material::{Dielectric, Lambertain, Metal};
 use crate::sphere::Sphere;
 use crate::utils::random_double_normal;
 use crate::vec3::{Color, Point, Vec3};
@@ -34,8 +36,14 @@ fn ray_color(r: Ray, world: &dyn Hittable, depth: u32) -> Color {
     }
 
     if world.hit(r, 0.001, f64::MAX, &mut temp_rec) {
-        let target = temp_rec.p + temp_rec.normal + Vec3::random_unit_vector();
-        return 0.5 * ray_color(Ray::new(temp_rec.p, target - temp_rec.p), world, depth - 1);
+        let mut scattered = Ray::default();
+        let mut attenuation = Color::default();
+        let mat = temp_rec.clone().mat;
+        if mat.scatter(r, temp_rec, &mut attenuation, &mut scattered) {
+            return attenuation * ray_color(scattered, world, depth - 1);
+        } else {
+            return Color::new(0.0,0.0,0.0)
+        }
     }
     let unit_dir = r.dir.unit();
     let t = 0.5 * (unit_dir.y + 1.0);
@@ -50,9 +58,39 @@ async fn main() {
     const SAMPLES_PER_PIXEL: u32 = 100;
     const MAX_DEPTH: u32 = 50;
 
+    let mat_ground = Arc::new(Lambertain::new(Color::new(0.8, 0.8, 0.0)));
+    let mat_center = Arc::new(Lambertain::new(Color::new(0.7, 0.3, 0.3)));
+    // let mat_left = Arc::new(Metal::new(Color::new(0.8, 0.8, 0.8), 0.3));
+    // let mat_center = Arc::new(Dielectric::new(1.5));
+    let mat_left = Arc::new(Dielectric::new(1.5));
+    let mat_right = Arc::new(Metal::new(Color::new(0.8, 0.6, 0.2), 1.0));
+
     let mut world = HittableList::new();
-    world.add(Arc::new(Sphere::new(Point::new(0.0, 0.0, -1.0), 0.5)));
-    world.add(Arc::new(Sphere::new(Point::new(0.0, -100.5, -1.0), 100.0)));
+    world.add(Arc::new(Sphere::new(
+        Point::new(0.0, -100.5, -1.0),
+        100.0,
+        mat_ground,
+    )));
+    world.add(Arc::new(Sphere::new(
+        Point::new(0.0, 0.0, -1.0),
+        0.5,
+        mat_center,
+    )));
+    world.add(Arc::new(Sphere::new(
+        Point::new(-1.0, 0.0, -1.0),
+        0.5,
+        mat_left.clone(),
+    )));
+    world.add(Arc::new(Sphere::new(
+        Point::new(-1.0, 0.0, -1.0),
+        -0.4,
+        mat_left.clone(),
+    )));
+    world.add(Arc::new(Sphere::new(
+        Point::new(1.0, 0.0, -1.0),
+        0.5,
+        mat_right,
+    )));
     let arc_world = Arc::new(world);
 
     let mut image: Image = Image::new(IMAGE_WIDTH, IMAGE_HEIGHT, 100);

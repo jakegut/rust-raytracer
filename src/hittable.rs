@@ -1,13 +1,16 @@
 use crate::{
+    material::{Lambertain, Material},
     ray::Ray,
     vec3::{Point, Vec3},
 };
-#[derive(Debug, Clone, Copy, Default)]
+use std::sync::Arc;
+#[derive(Clone)]
 pub struct HitRecord {
     pub p: Point,
     pub normal: Vec3,
     pub t: f64,
     pub front_face: bool,
+    pub mat: Arc<dyn Material>,
 }
 
 impl HitRecord {
@@ -18,6 +21,18 @@ impl HitRecord {
         } else {
             -outward_normal
         };
+    }
+}
+
+impl Default for HitRecord {
+    fn default() -> Self {
+        Self {
+            p: Vec3::default(),
+            normal: Vec3::default(),
+            t: 0.0,
+            front_face: false,
+            mat: Arc::new(Lambertain::default()),
+        }
     }
 }
 

@@ -1,4 +1,7 @@
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub};
+use std::{
+    cmp::min,
+    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub},
+};
 
 use crate::utils::{random_double, random_double_normal};
 
@@ -80,6 +83,22 @@ impl Vec3 {
 
     pub fn random_unit_vector() -> Vec3 {
         Vec3::random_in_unit_sphere().unit()
+    }
+
+    pub fn near_zero(&self) -> bool {
+        let s = 1e-8;
+        self.x.abs() < s && self.y.abs() < s && self.z.abs() < s
+    }
+
+    pub fn reflect(self, n: Vec3) -> Vec3 {
+        self - 2.0 * self.dot(n) * n
+    }
+
+    pub fn refract(self, n: Vec3, etai_over_etat: f64) -> Vec3 {
+        let cos_theta = (-self).dot(n).min(1.0);
+        let r_out_perp = etai_over_etat * (self + cos_theta * n);
+        let r_out_parallel = -((1.0 - r_out_perp.length_squared()).abs().sqrt()) * n;
+        r_out_parallel + r_out_perp
     }
 }
 
