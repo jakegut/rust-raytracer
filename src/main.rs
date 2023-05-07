@@ -1,24 +1,24 @@
+pub mod hittable;
+pub mod hittable_list;
 pub mod image;
 pub mod ray;
+pub mod sphere;
 pub mod vec3;
 
+use std::sync::Arc;
+
+use hittable::{HitRecord, Hittable};
 use ray::Ray;
 
+use crate::hittable_list::HittableList;
 use crate::image::Image;
+use crate::sphere::Sphere;
 use crate::vec3::{Color, Point, Vec3};
 
-fn hit_sphere(center: Point, radius: f64, ray: Ray) -> bool {
-    let oc = ray.orig - center;
-    let a = ray.dir.dot(ray.dir);
-    let b = 2.0 * oc.dot(ray.dir);
-    let c = oc.dot(oc) - radius * radius;
-    let disc = b * b - 4.0 * a * c;
-    disc > 0.0
-}
-
-fn ray_color(r: Ray) -> Color {
-    if hit_sphere(Point::new(0.0, 0.0, -1.0), 0.5, r) {
-        return Color::new(1.0, 0.0, 0.0);
+fn ray_color(r: Ray, world: &dyn Hittable) -> Color {
+    let mut temp_rec = HitRecord::default();
+    if world.hit(r, 0.0, f64::MAX, &mut temp_rec) {
+        return 0.5 * (temp_rec.normal + Color::new(1.0, 1.0, 1.0));
     }
     let unit_dir = r.dir.unit();
     let t = 0.5 * (unit_dir.y + 1.0);
@@ -29,6 +29,10 @@ fn main() {
     const ASPECT_RATIO: f64 = 16.0 / 9.0;
     const IMAGE_WIDTH: usize = 400;
     const IMAGE_HEIGHT: usize = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as usize;
+
+    let mut world = HittableList::new();
+    world.add(Arc::new(Sphere::new(Point::new(0.0, 0.0, -1.0), 0.5)));
+    world.add(Arc::new(Sphere::new(Point::new(0.0, -100.5, -1.0), 100.0)));
 
     let viewport_height = 2.0;
     let viewport_width = ASPECT_RATIO * viewport_height;
@@ -57,7 +61,7 @@ fn main() {
                 origin,
                 lower_left_corner + u * horizontal + v * vertical - origin,
             );
-            let pixel_color = ray_color(r);
+            let pixel_color = ray_color(r, &world);
 
             image.append_color(pixel_color)
         }
