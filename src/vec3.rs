@@ -1,5 +1,7 @@
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub};
 
+use crate::utils::{random_double, random_double_normal};
+
 #[derive(Debug, Clone, Copy)]
 pub struct Vec3 {
     pub x: f64,
@@ -45,6 +47,39 @@ impl Vec3 {
 
     pub fn length_squared(self) -> f64 {
         self.x * self.x + self.y * self.y + self.z * self.z
+    }
+
+    pub fn random_normal() -> Vec3 {
+        Vec3 {
+            x: random_double_normal(),
+            y: random_double_normal(),
+            z: random_double_normal(),
+        }
+    }
+
+    pub fn random(min: f64, max: f64) -> Vec3 {
+        Vec3 {
+            x: random_double(min, max),
+            y: random_double(min, max),
+            z: random_double(min, max),
+        }
+    }
+
+    pub fn random_in_unit_sphere() -> Vec3 {
+        let mut p = Vec3::default();
+        loop {
+            p = Vec3::random(-1.0, 1.0);
+            if p.length_squared() >= 1.0 {
+                continue;
+            } else {
+                break;
+            }
+        }
+        p
+    }
+
+    pub fn random_unit_vector() -> Vec3 {
+        Vec3::random_in_unit_sphere().unit()
     }
 }
 

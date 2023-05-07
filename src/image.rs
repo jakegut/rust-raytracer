@@ -25,9 +25,9 @@ impl Image {
         let mut b = color.z;
 
         let scale = 1.0 / (self.samples as f64);
-        r *= scale;
-        g *= scale;
-        b *= scale;
+        r = (r * scale).sqrt();
+        g = (g * scale).sqrt();
+        b = (b * scale).sqrt();
         self.data.push((256.0 * clamp(r, 0.0, 0.999)) as u8);
         self.data.push((256.0 * clamp(g, 0.0, 0.999)) as u8);
         self.data.push((256.0 * clamp(b, 0.0, 0.999)) as u8);
@@ -41,16 +41,16 @@ impl Image {
         let mut encoder = png::Encoder::new(w, self.width as u32, self.height as u32);
         encoder.set_color(png::ColorType::Rgb);
         encoder.set_depth(png::BitDepth::Eight);
-        encoder.set_source_gamma(png::ScaledFloat::from_scaled(45455)); // 1.0 / 2.2, scaled by 100000
-        encoder.set_source_gamma(png::ScaledFloat::new(1.0 / 2.2)); // 1.0 / 2.2, unscaled, but rounded
-        let source_chromaticities = png::SourceChromaticities::new(
-            // Using unscaled instantiation here
-            (0.31270, 0.32900),
-            (0.64000, 0.33000),
-            (0.30000, 0.60000),
-            (0.15000, 0.06000),
-        );
-        encoder.set_source_chromaticities(source_chromaticities);
+        // encoder.set_source_gamma(png::ScaledFloat::from_scaled(45455)); // 1.0 / 2.2, scaled by 100000
+        encoder.set_source_gamma(png::ScaledFloat::new(1.0 / 2.0)); // 1.0 / 2.2, unscaled, but rounded
+                                                                    // let source_chromaticities = png::SourceChromaticities::new(
+                                                                    //     // Using unscaled instantiation here
+                                                                    //     (0.31270, 0.32900),
+                                                                    //     (0.64000, 0.33000),
+                                                                    //     (0.30000, 0.60000),
+                                                                    //     (0.15000, 0.06000),
+                                                                    // );
+                                                                    // encoder.set_source_chromaticities(source_chromaticities);
         let mut writer = encoder.write_header().unwrap();
 
         writer.write_image_data(self.data.as_slice()).unwrap();
