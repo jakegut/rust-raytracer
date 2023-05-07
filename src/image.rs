@@ -1,27 +1,36 @@
 use std::{fs::File, io::BufWriter, path::Path};
 
-use crate::vec3::Color;
+use crate::{utils::clamp, vec3::Color};
 
 pub struct Image {
     data: Vec<u8>,
     width: usize,
     height: usize,
+    samples: u32,
 }
 
 impl Image {
-    pub fn new(width: usize, height: usize) -> Image {
+    pub fn new(width: usize, height: usize, samples: u32) -> Image {
         Image {
             data: Vec::with_capacity(width * height * 3),
             width,
             height,
+            samples,
         }
     }
 
     pub fn append_color(&mut self, color: Color) {
-        let c = color * 255.999;
-        self.data.push(c.x as u8);
-        self.data.push(c.y as u8);
-        self.data.push(c.z as u8);
+        let mut r = color.x;
+        let mut g = color.y;
+        let mut b = color.z;
+
+        let scale = 1.0 / (self.samples as f64);
+        r *= scale;
+        g *= scale;
+        b *= scale;
+        self.data.push((256.0 * clamp(r, 0.0, 0.999)) as u8);
+        self.data.push((256.0 * clamp(g, 0.0, 0.999)) as u8);
+        self.data.push((256.0 * clamp(b, 0.0, 0.999)) as u8);
     }
 
     pub fn write(&mut self) {
