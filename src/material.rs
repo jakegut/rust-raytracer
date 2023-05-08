@@ -5,7 +5,29 @@ use crate::{
     vec3::{Color, Vec3},
 };
 
-pub trait Material {
+pub enum Material {
+    Lambertain(Lambertain),
+    Metal(Metal),
+    Dielectric(Dielectric),
+}
+
+impl Scatterable for Material {
+    fn scatter(
+        &self,
+        ray_in: Ray,
+        hit_record: HitRecord,
+        attenuation: &mut Color,
+        scattered: &mut Ray,
+    ) -> bool {
+        match self {
+            Material::Lambertain(l) => l.scatter(ray_in, hit_record, attenuation, scattered),
+            Material::Metal(m) => m.scatter(ray_in, hit_record, attenuation, scattered),
+            Material::Dielectric(d) => d.scatter(ray_in, hit_record, attenuation, scattered),
+        }
+    }
+}
+
+pub trait Scatterable {
     fn scatter(
         &self,
         ray_in: Ray,
@@ -26,7 +48,7 @@ impl Lambertain {
     }
 }
 
-impl Material for Lambertain {
+impl Scatterable for Lambertain {
     fn scatter(
         &self,
         _ray_in: Ray,
@@ -58,7 +80,7 @@ impl Metal {
     }
 }
 
-impl Material for Metal {
+impl Scatterable for Metal {
     fn scatter(
         &self,
         ray_in: Ray,
@@ -92,7 +114,7 @@ impl Dielectric {
     }
 }
 
-impl Material for Dielectric {
+impl Scatterable for Dielectric {
     fn scatter(
         &self,
         ray_in: Ray,

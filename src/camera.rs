@@ -25,18 +25,18 @@ impl Camera {
         focus_dist: f64,
     ) -> Self {
         let theta = vfov.to_radians();
-        let half_height = (theta / 2.0).tan();
-        let half_width = aspect_ratio * half_height;
+        let h = (theta / 2.0).tan();
+        let viewport_height = 2.0 * h;
+        let viewport_width = aspect_ratio * viewport_height;
 
         let w = (lookfrom - lookat).unit();
         let u = vup.cross(w).unit();
         let v = w.cross(u);
 
         let origin = lookfrom;
-        let lower_left_corner =
-            origin - (u * half_width * focus_dist) - (v * half_height * focus_dist) - w;
-        let horizontal = u * 2.0 * half_width * focus_dist;
-        let vertical = v * 2.0 * half_height * focus_dist;
+        let horizontal = focus_dist * viewport_width * u;
+        let vertical = focus_dist * viewport_height * v;
+        let lower_left_corner = origin - horizontal / 2.0 - vertical / 2.0 - focus_dist * w;
 
         let lens_radius = aperture / 2.0;
 

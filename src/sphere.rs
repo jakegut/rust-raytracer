@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use crate::{
     hittable::{HitRecord, Hittable},
-    material::Material,
+    material::{Material, Scatterable},
     ray::Ray,
     vec3::Point,
 };
@@ -11,11 +11,11 @@ use crate::{
 pub struct Sphere {
     pub center: Point,
     pub radius: f64,
-    pub mat: Arc<dyn Material>,
+    pub mat: Arc<Material>,
 }
 
 impl Sphere {
-    pub fn new(center: Point, radius: f64, mat: Arc<dyn Material>) -> Sphere {
+    pub fn new(center: Point, radius: f64, mat: Arc<Material>) -> Sphere {
         Sphere {
             center,
             radius,

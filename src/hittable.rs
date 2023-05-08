@@ -1,5 +1,5 @@
 use crate::{
-    material::{Lambertain, Material},
+    material::{Lambertain, Material, Scatterable},
     ray::Ray,
     vec3::{Point, Vec3},
 };
@@ -10,7 +10,7 @@ pub struct HitRecord {
     pub normal: Vec3,
     pub t: f64,
     pub front_face: bool,
-    pub mat: Arc<dyn Material>,
+    pub mat: Arc<Material>,
 }
 
 impl HitRecord {
@@ -31,7 +31,7 @@ impl Default for HitRecord {
             normal: Vec3::default(),
             t: 0.0,
             front_face: false,
-            mat: Arc::new(Lambertain::default()),
+            mat: Arc::new(Material::Lambertain(Lambertain::default())),
         }
     }
 }
