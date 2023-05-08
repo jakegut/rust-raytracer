@@ -35,8 +35,8 @@ impl Vec3 {
     pub fn cross(self, rhs: Vec3) -> Vec3 {
         Vec3 {
             x: self.y * rhs.z - self.z * rhs.y,
-            y: self.z * rhs.z - self.x * rhs.z,
-            z: self.x * rhs.y - self.y - rhs.x,
+            y: self.z * rhs.x - self.x * rhs.z,
+            z: self.x * rhs.y - self.y * rhs.x,
         }
     }
 
@@ -74,15 +74,24 @@ impl Vec3 {
             p = Vec3::random(-1.0, 1.0);
             if p.length_squared() >= 1.0 {
                 continue;
-            } else {
-                break;
             }
+            return p;
         }
-        p
     }
 
     pub fn random_unit_vector() -> Vec3 {
         Vec3::random_in_unit_sphere().unit()
+    }
+
+    pub fn random_in_unit_disc() -> Vec3 {
+        let mut p = Vec3::default();
+        loop {
+            p = Vec3::new(random_double(-1.0, 1.0), random_double(-1.0, 1.0), 0.0);
+            if p.length_squared() >= 1.0 {
+                continue;
+            }
+            return p;
+        }
     }
 
     pub fn near_zero(&self) -> bool {
