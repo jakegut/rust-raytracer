@@ -42,7 +42,7 @@ fn ray_color(r: Ray, world: &dyn Hittable, depth: u32) -> Color {
         if mat.scatter(r, temp_rec, &mut attenuation, &mut scattered) {
             return attenuation * ray_color(scattered, world, depth - 1);
         } else {
-            return Color::new(0.0,0.0,0.0)
+            return Color::new(0.0, 0.0, 0.0);
         }
     }
     let unit_dir = r.dir.unit();
@@ -95,7 +95,13 @@ async fn main() {
 
     let mut image: Image = Image::new(IMAGE_WIDTH, IMAGE_HEIGHT, 100);
 
-    let camera = Arc::new(Camera::default());
+    let camera = Arc::new(Camera::new(
+        Point::new(-2.0, 2.0, 1.0),
+        Point::new(0.0, 0.0, -1.0),
+        Vec3::new(0.0, 1.0, 0.0),
+        90.0,
+        ASPECT_RATIO,
+    ));
 
     let rows: Vec<RowColors> = stream::iter(0..IMAGE_HEIGHT)
         .map(move |j| {

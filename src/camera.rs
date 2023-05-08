@@ -10,18 +10,20 @@ pub struct Camera {
     vertical: Vec3,
 }
 
-impl Default for Camera {
-    fn default() -> Self {
-        const ASPECT_RATIO: f64 = 16.0 / 9.0;
-        let viewport_height = 2.0;
-        let viewport_width = ASPECT_RATIO * viewport_height;
-        let focal_length = 1.0;
+impl Camera {
+    pub fn new(lookfrom: Point, lookat: Point, vup: Vec3, vfov: f64, aspect_ratio: f64) -> Self {
+        let theta = vfov.to_radians();
+        let half_height = (theta / 2.0).tan();
+        let half_width = aspect_ratio * half_height;
 
-        let origin = Point::new(0.0, 0.0, 0.0);
-        let horizontal = Vec3::new(viewport_width, 0.0, 0.0);
-        let vertical = Vec3::new(0.0, viewport_height, 0.0);
-        let lower_left_corner =
-            origin - horizontal / 2.0 - vertical / 2.0 - Vec3::new(0.0, 0.0, focal_length);
+        let w = (lookfrom - lookat).unit();
+        let u = vup.cross(w).unit();
+        let v = w.cross(u);
+
+        let origin = lookfrom;
+        let lower_left_corner = origin - (u * half_width) - (v * half_height) - w;
+        let horizontal = u * 2.0 * half_width;
+        let vertical = v * 2.0 * half_height;
 
         Camera {
             origin,
@@ -33,10 +35,10 @@ impl Default for Camera {
 }
 
 impl Camera {
-    pub fn get_ray(&self, u: f64, v: f64) -> Ray {
+    pub fn get_ray(&self, s: f64, t: f64) -> Ray {
         Ray {
             orig: self.origin,
-            dir: self.lower_left_corner + u * self.horizontal + v * self.vertical - self.origin,
+            dir: self.lower_left_corner + (s * self.horizontal) + (t * self.vertical) - self.origin,
         }
     }
 }
