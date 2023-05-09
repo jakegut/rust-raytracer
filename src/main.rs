@@ -1,5 +1,8 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use std::sync::{Arc, Mutex};
 
+use eframe::egui;
+use eframe::epaint::Vec2;
 use rayon::ThreadPoolBuilder;
 use rust_raytracer::hittable::Hittable;
 use rust_raytracer::material::{Material, Scatterable};
@@ -11,7 +14,7 @@ use rust_raytracer::camera::Camera;
 use rust_raytracer::hittable_list::HittableList;
 use rust_raytracer::image::Image;
 use rust_raytracer::material::{Dielectric, Lambertain, Metal};
-use rust_raytracer::sphere::Sphere;
+use rust_raytracer::sphere::{MovingSphere, Sphere};
 use rust_raytracer::utils::random_double_normal;
 use rust_raytracer::vec3::{Color, Point, Vec3};
 
@@ -44,7 +47,13 @@ fn random_scene() -> HittableList {
                 if choose_mat < 0.8 {
                     let albedo = Color::random_normal() * Color::random_normal();
                     let mat = Arc::new(Material::Lambertain(Lambertain::new(albedo)));
-                    world.add(Arc::new(Object::Sphere(Sphere::new(center, 0.2, mat))));
+                    let center1 = center + Vec3::new(0.0, random_double(0.0, 0.5), 0.0);
+                    world.add(Arc::new(Object::MovingSphere(MovingSphere::new(
+                        (center, center1),
+                        (0.0, 1.0),
+                        0.2,
+                        mat,
+                    ))));
                 } else if choose_mat < 0.95 {
                     let albedo = Color::random(0.5, 1.0);
                     let fuzz = random_double(0.0, 0.5);
@@ -108,11 +117,11 @@ fn ray_color(r: &Ray, world: &Object, depth: u32) -> Color {
     }
 }
 
-fn main() {
-    const ASPECT_RATIO: f64 = 3.0 / 2.0;
-    const IMAGE_WIDTH: usize = 600;
+fn _raytrace() {
+    const ASPECT_RATIO: f64 = 16.0 / 9.0;
+    const IMAGE_WIDTH: usize = 400;
     const IMAGE_HEIGHT: usize = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as usize;
-    const SAMPLES_PER_PIXEL: u32 = 50;
+    const SAMPLES_PER_PIXEL: u32 = 100;
     const MAX_DEPTH: u32 = 50;
 
     let world = Object::HittableList(random_scene());
@@ -126,15 +135,18 @@ fn main() {
     let dist_to_focus = 10.0;
     let aperature = 0.1;
 
-    let camera = Arc::new(Camera::new(
-        lookfrom,
-        lookat,
-        vup,
-        20.0,
-        ASPECT_RATIO,
-        aperature,
-        dist_to_focus,
-    ));
+    let camera = Arc::new(
+        Camera::new(
+            lookfrom,
+            lookat,
+            vup,
+            20.0,
+            ASPECT_RATIO,
+            aperature,
+            dist_to_focus,
+        )
+        .with_time(0.0, 1.0),
+    );
 
     let mut row_colors = Vec::with_capacity(IMAGE_HEIGHT);
     row_colors.resize_with(IMAGE_HEIGHT, || RowColors { row: vec![] });
@@ -175,4 +187,37 @@ fn main() {
     }
 
     image.write()
+}
+
+fn main() {
+    let native_options = eframe::NativeOptions {
+        // initial_window_size: Some(Vec2::new(1024.0, 1024.0)),
+        ..Default::default()
+    };
+    eframe::run_native(
+        "My egui app",
+        native_options,
+        Box::new(|cc| Box::new(MyEguiApp::new(cc))),
+    );
+}
+
+#[derive(Default)]
+struct MyEguiApp {}
+
+impl MyEguiApp {
+    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+        // Customize egui here with cc.egui_ctx.set_fonts and cc.egui_ctx.set_visuals.
+        // Restore app state using cc.storage (requires the "persistence" feature).
+        // Use the cc.gl (a glow::Context) to create graphics shaders and buffers that you can use
+        // for e.g. egui::PaintCallback.
+        Self::default()
+    }
+}
+
+impl eframe::App for MyEguiApp {
+    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        egui::CentralPanel::default().show(ctx, |ui| {
+            ui.heading("Hello World!");
+        });
+    }
 }

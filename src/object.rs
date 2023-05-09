@@ -1,12 +1,13 @@
 use crate::{
     hittable::{HitRecord, Hittable},
     hittable_list::HittableList,
-    sphere::Sphere,
+    sphere::{MovingSphere, Sphere},
 };
 
 pub enum Object {
     Sphere(Sphere),
     HittableList(HittableList),
+    MovingSphere(MovingSphere),
 }
 
 impl Hittable for Object {
@@ -14,6 +15,7 @@ impl Hittable for Object {
         match self {
             Object::Sphere(s) => s.hit(r, t_min, t_max),
             Object::HittableList(hl) => hl.hit(r, t_min, t_max),
+            Object::MovingSphere(ms) => ms.hit(r, t_min, t_max),
         }
     }
 }

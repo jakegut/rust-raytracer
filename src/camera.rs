@@ -1,8 +1,10 @@
 use crate::{
     ray::Ray,
+    utils::random_double,
     vec3::{Point, Vec3},
 };
 
+#[derive(Clone, Copy)]
 pub struct Camera {
     origin: Point,
     lower_left_corner: Point,
@@ -11,6 +13,7 @@ pub struct Camera {
     u: Vec3,
     v: Vec3,
     lens_radius: f64,
+    time: (f64, f64),
 }
 
 impl Camera {
@@ -47,6 +50,7 @@ impl Camera {
             u,
             v,
             lens_radius,
+            time: (0.0, 0.0),
         }
     }
 }
@@ -61,6 +65,12 @@ impl Camera {
             dir: self.lower_left_corner + (s * self.horizontal) + (t * self.vertical)
                 - self.origin
                 - offset,
+            time: random_double(self.time.0, self.time.1),
         }
+    }
+
+    pub fn with_time(&mut self, t0: f64, t1: f64) -> Self {
+        self.time = (t0, t1);
+        *self
     }
 }

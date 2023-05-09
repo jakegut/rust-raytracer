@@ -55,3 +55,58 @@ impl Hittable for Sphere {
         Some(rec)
     }
 }
+
+pub struct MovingSphere {
+    center: (Point, Point),
+    time: (f64, f64),
+    radius: f64,
+    mat: Arc<Material>,
+}
+
+impl MovingSphere {
+    pub fn new(center: (Point, Point), time: (f64, f64), radius: f64, mat: Arc<Material>) -> Self {
+        MovingSphere {
+            center,
+            time,
+            radius,
+            mat,
+        }
+    }
+
+    pub fn center(&self, time: f64) -> Point {
+        self.center.0
+            + ((time - self.time.0) / (self.time.1 - self.time.0)) * (self.center.1 - self.center.0)
+    }
+}
+
+impl Hittable for MovingSphere {
+    fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let oc = r.orig - self.center(r.time);
+        let a = r.dir.length_squared();
+        let half_b = oc.dot(r.dir);
+        let c = oc.length_squared() - self.radius * self.radius;
+
+        let disc = half_b * half_b - a * c;
+        if disc < 0.0 {
+            return None;
+        }
+        let sqrtd = disc.sqrt();
+
+        let mut root = (-half_b - sqrtd) / a;
+        if root < t_min || t_max < root {
+            root = (-half_b + sqrtd) / a;
+            if root < t_min || t_max < root {
+                return None;
+            }
+        }
+
+        let mut rec = HitRecord::default();
+        rec.t = root;
+        rec.p = r.at(rec.t);
+        let outward_normal = (rec.p - self.center(r.time)) / self.radius;
+        rec.set_face_normal(r, outward_normal);
+        rec.mat = self.mat.clone();
+
+        Some(rec)
+    }
+}

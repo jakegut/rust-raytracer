@@ -37,12 +37,15 @@ impl Lambertain {
 }
 
 impl Scatterable for Lambertain {
-    fn scatter(&self, _ray_in: &Ray, hit_record: &HitRecord) -> Option<(Option<Ray>, Color)> {
+    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<(Option<Ray>, Color)> {
         let mut scatter_dir = hit_record.normal + Vec3::random_unit_vector();
         if scatter_dir.near_zero() {
             scatter_dir = hit_record.normal;
         }
-        Some((Some(Ray::new(hit_record.p, scatter_dir)), self.albedo))
+        Some((
+            Some(Ray::new(hit_record.p, scatter_dir).with_time(ray_in.time)),
+            self.albedo,
+        ))
     }
 }
 
@@ -66,7 +69,8 @@ impl Scatterable for Metal {
         let scattered = Ray::new(
             hit_record.p,
             reflected + self.fuzz * Vec3::random_in_unit_sphere(),
-        );
+        )
+        .with_time(ray_in.time);
         if scattered.dir.dot(hit_record.normal) > 0.0 {
             Some((Some(scattered), self.albedo))
         } else {
@@ -114,7 +118,7 @@ impl Scatterable for Dielectric {
         };
 
         Some((
-            Some(Ray::new(hit_record.p, direction)),
+            Some(Ray::new(hit_record.p, direction).with_time(ray_in.time)),
             Color::new(1.0, 1.0, 1.0),
         ))
     }
