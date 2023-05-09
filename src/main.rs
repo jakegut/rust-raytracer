@@ -1,33 +1,19 @@
-pub mod camera;
-pub mod hittable;
-pub mod hittable_list;
-pub mod image;
-pub mod material;
-pub mod object;
-pub mod ray;
-pub mod sphere;
-pub mod utils;
-pub mod vec3;
+use std::sync::{Arc, Mutex};
 
-use std::char::MAX;
-use std::os::unix::thread;
-use std::sync::{Arc, Barrier, Mutex};
+use rayon::ThreadPoolBuilder;
+use rust_raytracer::hittable::Hittable;
+use rust_raytracer::material::{Material, Scatterable};
+use rust_raytracer::object::Object;
+use rust_raytracer::ray::Ray;
+use rust_raytracer::utils::random_double;
 
-use hittable::{HitRecord, Hittable};
-use material::{Material, Scatterable};
-use object::Object;
-use ray::Ray;
-use rayon::{vec, ThreadPoolBuilder};
-use utils::random_double;
-
-use crate::camera::Camera;
-use crate::hittable_list::HittableList;
-use crate::image::Image;
-use crate::material::{Dielectric, Lambertain, Metal};
-use crate::sphere::Sphere;
-use crate::utils::random_double_normal;
-use crate::vec3::{Color, Point, Vec3};
-use futures::{stream, StreamExt};
+use rust_raytracer::camera::Camera;
+use rust_raytracer::hittable_list::HittableList;
+use rust_raytracer::image::Image;
+use rust_raytracer::material::{Dielectric, Lambertain, Metal};
+use rust_raytracer::sphere::Sphere;
+use rust_raytracer::utils::random_double_normal;
+use rust_raytracer::vec3::{Color, Point, Vec3};
 
 struct RowColors {
     row: Vec<Color>,
@@ -98,36 +84,38 @@ fn random_scene() -> HittableList {
     world
 }
 
-fn ray_color(r: Ray, world: &dyn Hittable, depth: u32) -> Color {
-    let mut temp_rec = HitRecord::default();
-
+fn ray_color(r: &Ray, world: &Object, depth: u32) -> Color {
     if depth <= 0 {
         return Color::default();
     }
 
-    if world.hit(r, 0.001, f64::MAX, &mut temp_rec) {
-        let mut scattered = Ray::default();
-        let mut attenuation = Color::default();
-        let mat = temp_rec.clone().mat;
-        if mat.scatter(r, temp_rec, &mut attenuation, &mut scattered) {
-            return attenuation * ray_color(scattered, world, depth - 1);
-        } else {
-            return Color::new(0.0, 0.0, 0.0);
+    match world.hit(&r, 0.001, f64::MAX) {
+        Some(rec) => {
+            let mat = rec.clone().mat;
+            match mat.scatter(&r, &rec) {
+                Some((Some(scattered), attenuation)) => {
+                    attenuation * ray_color(&scattered, world, depth - 1)
+                }
+                None => Color::new_empty(),
+                Some((None, _)) => todo!(),
+            }
+        }
+        None => {
+            let unit_dir = r.dir.unit();
+            let t = 0.5 * (unit_dir.y + 1.0);
+            (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
         }
     }
-    let unit_dir = r.dir.unit();
-    let t = 0.5 * (unit_dir.y + 1.0);
-    (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
 }
 
 fn main() {
     const ASPECT_RATIO: f64 = 3.0 / 2.0;
-    const IMAGE_WIDTH: usize = 1200;
+    const IMAGE_WIDTH: usize = 600;
     const IMAGE_HEIGHT: usize = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as usize;
-    const SAMPLES_PER_PIXEL: u32 = 500;
+    const SAMPLES_PER_PIXEL: u32 = 50;
     const MAX_DEPTH: u32 = 50;
 
-    let world = random_scene();
+    let world = Object::HittableList(random_scene());
     let arc_world = Arc::new(world);
 
     let mut image: Image = Image::new(IMAGE_WIDTH, IMAGE_HEIGHT, SAMPLES_PER_PIXEL);
@@ -148,10 +136,10 @@ fn main() {
         dist_to_focus,
     ));
 
-    let rows: Arc<Mutex<Vec<RowColors>>> = Arc::new(Mutex::new(Vec::with_capacity(IMAGE_HEIGHT)));
-    let mut data = rows.lock().unwrap();
-    data.resize_with(IMAGE_HEIGHT, || RowColors { row: vec![] });
-    drop(data);
+    let mut row_colors = Vec::with_capacity(IMAGE_HEIGHT);
+    row_colors.resize_with(IMAGE_HEIGHT, || RowColors { row: vec![] });
+
+    let rows: Arc<Mutex<Vec<RowColors>>> = Arc::new(Mutex::new(row_colors));
 
     let pool = ThreadPoolBuilder::new().num_threads(12).build().unwrap();
 
@@ -168,7 +156,7 @@ fn main() {
                         let u = ((i as f64) + random_double_normal()) / (IMAGE_WIDTH - 1) as f64;
                         let v = ((j as f64) + random_double_normal()) / (IMAGE_HEIGHT - 1) as f64;
                         let r = camera.get_ray(u, v);
-                        pixel_color += ray_color(r, arc_world.as_ref(), MAX_DEPTH);
+                        pixel_color += ray_color(&r, arc_world.as_ref(), MAX_DEPTH);
                     }
 
                     v.push(pixel_color);

@@ -1,7 +1,4 @@
-use std::{
-    cmp::min,
-    ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub},
-};
+use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub};
 
 use crate::utils::{random_double, random_double_normal};
 
@@ -69,9 +66,8 @@ impl Vec3 {
     }
 
     pub fn random_in_unit_sphere() -> Vec3 {
-        let mut p = Vec3::default();
         loop {
-            p = Vec3::random(-1.0, 1.0);
+            let p = Vec3::random(-1.0, 1.0);
             if p.length_squared() >= 1.0 {
                 continue;
             }
@@ -84,9 +80,8 @@ impl Vec3 {
     }
 
     pub fn random_in_unit_disc() -> Vec3 {
-        let mut p = Vec3::default();
         loop {
-            p = Vec3::new(random_double(-1.0, 1.0), random_double(-1.0, 1.0), 0.0);
+            let p = Vec3::new(random_double(-1.0, 1.0), random_double(-1.0, 1.0), 0.0);
             if p.length_squared() >= 1.0 {
                 continue;
             }
