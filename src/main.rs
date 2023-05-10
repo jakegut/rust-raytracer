@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
 use std::thread;
 
 use eframe::egui;
-use egui::{ColorImage, Vec2, Color32};
+use egui::{Color32, ColorImage, Vec2};
 use rayon::ThreadPoolBuilder;
 use rust_raytracer::hittable::Hittable;
 use rust_raytracer::material::{Material, Scatterable};
@@ -241,8 +241,12 @@ impl MyEguiApp {
     }
 }
 
-fn image_as_u8(image: &ColorImage) -> &[u8] {
-    
+fn image_as_u8(image: &ColorImage) -> Vec<u8> {
+    image
+        .pixels
+        .iter()
+        .flat_map(Color32::to_array)
+        .collect()
 }
 
 impl eframe::App for MyEguiApp {
@@ -252,15 +256,25 @@ impl eframe::App for MyEguiApp {
             let current_image = frame_thing.clone();
             self.texture = Some(
                 ui.ctx()
-                    .load_texture("scene", frame_thing, Default::default()),
+                    .load_texture("scene", current_image.clone(), Default::default()),
             );
 
             if ui.button("save image").clicked() {
                 if let Some(path) = rfd::FileDialog::new().save_file() {
-                    if let Some(color_image) = self.current_frame {
-                        image::save_buffer_with_format(path.display().to_string()self.current_frame.as_raw());
+                    let res = image::save_buffer_with_format(
+                        path.display().to_string(),
+                        &image_as_u8(&current_image),
+                        current_image.width() as u32,
+                        current_image.height() as u32,
+                        image::ColorType::Rgba8,
+                        image::ImageFormat::Png,
+                    );
+
+                    match res {
+                        Err(e) => println!("error: {}", e.to_string()),
+                        Ok(_) => {}
                     }
-                }
+                };
             };
 
             if let Some(texture) = self.texture.as_ref() {

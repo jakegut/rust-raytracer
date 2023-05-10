@@ -1,9 +1,4 @@
-use std::{
-    fs::File,
-    io::BufWriter,
-    path::Path,
-    sync::{Arc, RwLock},
-};
+use std::sync::{Arc, RwLock};
 
 use eframe::epaint::{Color32, ColorImage};
 
