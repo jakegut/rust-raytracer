@@ -1,8 +1,9 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
+use std::thread;
 
 use eframe::egui;
-use eframe::epaint::Vec2;
+use egui::{ColorImage, Vec2, Color32};
 use rayon::ThreadPoolBuilder;
 use rust_raytracer::hittable::Hittable;
 use rust_raytracer::material::{Material, Scatterable};
@@ -117,17 +118,16 @@ fn ray_color(r: &Ray, world: &Object, depth: u32) -> Color {
     }
 }
 
-fn _raytrace() {
-    const ASPECT_RATIO: f64 = 16.0 / 9.0;
-    const IMAGE_WIDTH: usize = 400;
-    const IMAGE_HEIGHT: usize = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as usize;
+fn raytrace(image_width: usize, aspect_ratio: f64, frame: Arc<RwLock<ColorImage>>) {
+    let image_height: usize = (image_width as f64 / aspect_ratio) as usize;
     const SAMPLES_PER_PIXEL: u32 = 100;
     const MAX_DEPTH: u32 = 50;
 
     let world = Object::HittableList(random_scene());
     let arc_world = Arc::new(world);
 
-    let mut image: Image = Image::new(IMAGE_WIDTH, IMAGE_HEIGHT, SAMPLES_PER_PIXEL);
+    let image: Image = Image::new(image_width, image_height, SAMPLES_PER_PIXEL, frame);
+    let arc_image = Arc::new(Mutex::new(image));
 
     let lookfrom = Vec3::new(13.0, 2.0, 3.0);
     let lookat = Vec3::new(0.0, 0.0, 0.0);
@@ -141,83 +141,135 @@ fn _raytrace() {
             lookat,
             vup,
             20.0,
-            ASPECT_RATIO,
+            aspect_ratio,
             aperature,
             dist_to_focus,
         )
         .with_time(0.0, 1.0),
     );
 
-    let mut row_colors = Vec::with_capacity(IMAGE_HEIGHT);
-    row_colors.resize_with(IMAGE_HEIGHT, || RowColors { row: vec![] });
+    // let mut row_colors = Vec::with_capacity(image_height);
+    // row_colors.resize_with(image_height, || RowColors { row: vec![] });
 
-    let rows: Arc<Mutex<Vec<RowColors>>> = Arc::new(Mutex::new(row_colors));
+    // let rows: Arc<Mutex<Vec<RowColors>>> = Arc::new(Mutex::new(row_colors));
 
     let pool = ThreadPoolBuilder::new().num_threads(12).build().unwrap();
 
     pool.scope(|s| {
-        for j in 0..IMAGE_HEIGHT {
+        for j in 0..image_height {
             let arc_world = arc_world.clone();
             let camera = camera.clone();
-            let rows = rows.clone();
+            // let rows = rows.clone();
+            let image = arc_image.clone();
             s.spawn(move |_| {
-                let mut v: Vec<Color> = Vec::new();
-                for i in 0..IMAGE_WIDTH {
+                let mut colors = vec![Color::new_empty(); image_width];
+                for i in 0..image_width {
                     let mut pixel_color = Color::default();
                     for _s in 0..SAMPLES_PER_PIXEL {
-                        let u = ((i as f64) + random_double_normal()) / (IMAGE_WIDTH - 1) as f64;
-                        let v = ((j as f64) + random_double_normal()) / (IMAGE_HEIGHT - 1) as f64;
+                        let u = ((i as f64) + random_double_normal()) / (image_width - 1) as f64;
+                        let v = ((j as f64) + random_double_normal()) / (image_height - 1) as f64;
                         let r = camera.get_ray(u, v);
                         pixel_color += ray_color(&r, arc_world.as_ref(), MAX_DEPTH);
                     }
-
-                    v.push(pixel_color);
+                    colors[i] = pixel_color;
                 }
-                let mut data = rows.lock().unwrap();
-                data[j] = RowColors { row: v };
-                println!("finished {}", j);
+                let mut img = image.lock().unwrap();
+                for (i, color) in colors.iter().enumerate() {
+                    img.append_color(color, i, image_height - j - 1);
+                }
+                // let mut data = rows.lock().unwrap();
+                // data[j] = RowColors { row: v };
+                // println!("finished {}", j);
             })
         }
     });
 
-    for row in rows.lock().unwrap().iter().rev() {
-        for color in &row.row {
-            image.append_color(*color)
-        }
-    }
+    // for row in rows.lock().unwrap().iter().rev() {
+    //     for color in &row.row {
+    //         image.append_color(*color)
+    //     }
+    // }
 
-    image.write()
+    // image.write()
 }
 
 fn main() {
+    let width: usize = 600;
+    let aspect_ratio: f64 = 16.0 / 9.0;
+    let height = (width as f64 / aspect_ratio) as usize;
     let native_options = eframe::NativeOptions {
-        // initial_window_size: Some(Vec2::new(1024.0, 1024.0)),
+        initial_window_size: Some(Vec2::new(width as f32, height as f32)),
         ..Default::default()
     };
     eframe::run_native(
         "My egui app",
         native_options,
-        Box::new(|cc| Box::new(MyEguiApp::new(cc))),
+        Box::new(move |cc| Box::new(MyEguiApp::new(cc, width, aspect_ratio))),
     );
 }
 
 #[derive(Default)]
-struct MyEguiApp {}
+struct MyEguiApp {
+    texture: Option<egui::TextureHandle>,
+    frame_thing: Arc<RwLock<ColorImage>>,
+    current_frame: Option<ColorImage>,
+    image_width: usize,
+    aspect_ratio: f64,
+}
 
 impl MyEguiApp {
-    fn new(_cc: &eframe::CreationContext<'_>) -> Self {
+    fn new(_cc: &eframe::CreationContext<'_>, image_width: usize, aspect_ratio: f64) -> Self {
         // Customize egui here with cc.egui_ctx.set_fonts and cc.egui_ctx.set_visuals.
         // Restore app state using cc.storage (requires the "persistence" feature).
         // Use the cc.gl (a glow::Context) to create graphics shaders and buffers that you can use
         // for e.g. egui::PaintCallback.
-        Self::default()
+        let height = (image_width as f64 / aspect_ratio) as usize;
+        let frame_thing = Arc::new(RwLock::new(ColorImage::new(
+            [image_width, height],
+            Color32::BLACK,
+        )));
+        {
+            let frame_thing = frame_thing.clone();
+            thread::spawn(move || raytrace(image_width, aspect_ratio, frame_thing));
+        }
+        Self {
+            frame_thing: frame_thing.clone(),
+            image_width,
+            aspect_ratio,
+            ..Default::default()
+        }
     }
+}
+
+fn image_as_u8(image: &ColorImage) -> &[u8] {
+    
 }
 
 impl eframe::App for MyEguiApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         egui::CentralPanel::default().show(ctx, |ui| {
-            ui.heading("Hello World!");
+            let frame_thing = self.frame_thing.read().unwrap();
+            let current_image = frame_thing.clone();
+            self.texture = Some(
+                ui.ctx()
+                    .load_texture("scene", frame_thing, Default::default()),
+            );
+
+            if ui.button("save image").clicked() {
+                if let Some(path) = rfd::FileDialog::new().save_file() {
+                    if let Some(color_image) = self.current_frame {
+                        image::save_buffer_with_format(path.display().to_string()self.current_frame.as_raw());
+                    }
+                }
+            };
+
+            if let Some(texture) = self.texture.as_ref() {
+                ui.image(texture, ui.available_size())
+            } else {
+                ui.spinner()
+            };
+
+            ctx.request_repaint()
         });
     }
 }
