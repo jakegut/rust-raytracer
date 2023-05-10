@@ -1,4 +1,4 @@
-use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub};
+use std::ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Neg, Sub};
 
 use crate::utils::{random_double, random_double_normal};
 
@@ -219,6 +219,19 @@ impl Neg for Vec3 {
 
     fn neg(self) -> Self::Output {
         Vec3::new(-self.x, -self.y, -self.z)
+    }
+}
+
+impl Index<usize> for Vec3 {
+    type Output = f64;
+    fn index(&self, index: usize) -> &Self::Output {
+        assert!(index < 3);
+        match index {
+            0 => &self.x,
+            1 => &self.y,
+            2 => &self.z,
+            _ => unreachable!(),
+        }
     }
 }
 

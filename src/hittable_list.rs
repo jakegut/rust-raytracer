@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
+    aabb::AABB,
     hittable::{HitRecord, Hittable},
     object::Object,
 };
@@ -42,5 +43,30 @@ impl Hittable for HittableList {
         }
 
         return rec;
+    }
+
+    fn bounding_box(&self, time: (f64, f64)) -> Option<AABB> {
+        if self.objects.len() == 0 {
+            return None;
+        };
+
+        let mut output_box = AABB::default();
+        let mut first_box = false;
+
+        for object in self.objects.iter() {
+            match object.bounding_box(time) {
+                None => return None,
+                Some(aabb) => {
+                    output_box = if first_box {
+                        aabb
+                    } else {
+                        AABB::from_surrounding(output_box, aabb)
+                    };
+                    first_box = false
+                }
+            }
+        }
+
+        Some(output_box)
     }
 }

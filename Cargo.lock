@@ -1947,7 +1947,6 @@ name = "rust-raytracer"
 version = "0.1.0"
 dependencies = [
  "eframe",
- "egui",
  "image",
  "rand",
  "rayon",

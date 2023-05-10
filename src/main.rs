@@ -1,10 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
 use std::thread;
+use std::time::Instant;
 
-use eframe::egui;
+use eframe::{egui, Error};
 use egui::{Color32, ColorImage, Vec2};
 use rayon::ThreadPoolBuilder;
+use rust_raytracer::bvh::BVHNode;
 use rust_raytracer::hittable::Hittable;
 use rust_raytracer::material::{Material, Scatterable};
 use rust_raytracer::object::Object;
@@ -18,10 +20,6 @@ use rust_raytracer::material::{Dielectric, Lambertain, Metal};
 use rust_raytracer::sphere::{MovingSphere, Sphere};
 use rust_raytracer::utils::random_double_normal;
 use rust_raytracer::vec3::{Color, Point, Vec3};
-
-struct RowColors {
-    row: Vec<Color>,
-}
 
 fn random_scene() -> HittableList {
     let mut world = HittableList::new();
@@ -121,9 +119,10 @@ fn ray_color(r: &Ray, world: &Object, depth: u32) -> Color {
 fn raytrace(image_width: usize, aspect_ratio: f64, frame: Arc<RwLock<ColorImage>>) {
     let image_height: usize = (image_width as f64 / aspect_ratio) as usize;
     const SAMPLES_PER_PIXEL: u32 = 100;
-    const MAX_DEPTH: u32 = 50;
+    const MAX_DEPTH: u32 = 5;
 
-    let world = Object::HittableList(random_scene());
+    let world = Object::BVHNode(BVHNode::new(&mut random_scene(), (0.0, 1.0)));
+    // let world = Object::HittableList(random_scene());
     let arc_world = Arc::new(world);
 
     let image: Image = Image::new(image_width, image_height, SAMPLES_PER_PIXEL, frame);
@@ -155,6 +154,7 @@ fn raytrace(image_width: usize, aspect_ratio: f64, frame: Arc<RwLock<ColorImage>
 
     let pool = ThreadPoolBuilder::new().num_threads(12).build().unwrap();
 
+    let start = Instant::now();
     pool.scope(|s| {
         for j in 0..image_height {
             let arc_world = arc_world.clone();
@@ -162,7 +162,12 @@ fn raytrace(image_width: usize, aspect_ratio: f64, frame: Arc<RwLock<ColorImage>
             // let rows = rows.clone();
             let image = arc_image.clone();
             s.spawn(move |_| {
-                let mut colors = vec![Color::new_empty(); image_width];
+                let mut colors = vec![Color::new(SAMPLES_PER_PIXEL as f64, 0.0, 0.0); image_width];
+                let mut img = image.lock().unwrap();
+                for (i, color) in colors.iter().enumerate() {
+                    img.append_color(color, i, image_height - j - 1);
+                }
+                drop(img);
                 for i in 0..image_width {
                     let mut pixel_color = Color::default();
                     for _s in 0..SAMPLES_PER_PIXEL {
@@ -183,6 +188,8 @@ fn raytrace(image_width: usize, aspect_ratio: f64, frame: Arc<RwLock<ColorImage>
             })
         }
     });
+    let duration = start.elapsed();
+    println!("Time elapsed in ray_trace() is: {:?}", duration);
 
     // for row in rows.lock().unwrap().iter().rev() {
     //     for color in &row.row {
@@ -193,19 +200,21 @@ fn raytrace(image_width: usize, aspect_ratio: f64, frame: Arc<RwLock<ColorImage>
     // image.write()
 }
 
-fn main() {
+fn main() -> Result<(), Error> {
     let width: usize = 600;
     let aspect_ratio: f64 = 16.0 / 9.0;
     let height = (width as f64 / aspect_ratio) as usize;
     let native_options = eframe::NativeOptions {
         initial_window_size: Some(Vec2::new(width as f32, height as f32)),
+        renderer: eframe::Renderer::Glow,
+        resizable: true,
         ..Default::default()
     };
     eframe::run_native(
         "My egui app",
         native_options,
         Box::new(move |cc| Box::new(MyEguiApp::new(cc, width, aspect_ratio))),
-    );
+    )
 }
 
 #[derive(Default)]
@@ -230,7 +239,9 @@ impl MyEguiApp {
         )));
         {
             let frame_thing = frame_thing.clone();
-            thread::spawn(move || raytrace(image_width, aspect_ratio, frame_thing));
+            thread::spawn(move || {
+                raytrace(image_width, aspect_ratio, frame_thing);
+            });
         }
         Self {
             frame_thing: frame_thing.clone(),
@@ -242,11 +253,7 @@ impl MyEguiApp {
 }
 
 fn image_as_u8(image: &ColorImage) -> Vec<u8> {
-    image
-        .pixels
-        .iter()
-        .flat_map(Color32::to_array)
-        .collect()
+    image.pixels.iter().flat_map(Color32::to_array).collect()
 }
 
 impl eframe::App for MyEguiApp {
@@ -254,10 +261,11 @@ impl eframe::App for MyEguiApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             let frame_thing = self.frame_thing.read().unwrap();
             let current_image = frame_thing.clone();
-            self.texture = Some(
-                ui.ctx()
-                    .load_texture("scene", current_image.clone(), Default::default()),
-            );
+            self.texture = Some(ui.ctx().load_texture(
+                "scene",
+                current_image.clone(),
+                Default::default(),
+            ));
 
             if ui.button("save image").clicked() {
                 if let Some(path) = rfd::FileDialog::new().save_file() {
