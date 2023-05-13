@@ -114,7 +114,7 @@ fn cornell_box() -> HittableList {
         0.12, 0.45, 0.15,
     ))));
     let light = Arc::new(Material::DiffuseLight(DiffuseLight::from_color(
-        &Color::new(20.0, 20.0, 20.0),
+        &Color::new(20.0, 15.0, 10.0),
     )));
 
     world.add(Arc::new(Object::YZRect(YZRect::new(
@@ -148,58 +148,43 @@ fn cornell_box() -> HittableList {
         white.clone(),
     ))));
 
-    // world.add(Arc::new(Object::RectBox(RectBox::new(
-    //     &Point::new(130.0, 0.0, 65.0),
-    //     &Point::new(295.0, 165.0, 230.0),
-    //     white.clone(),
-    // ))));
+    let box0 = Arc::new(Object::RectBox(RectBox::new(
+        &Point::new(0.0, 0.0, 0.0),
+        &Point::new(165.0, 165.0, 165.0),
+        white.clone(),
+    )));
+    let box0_mat = glam::DMat4::from_rotation_translation(
+        glam::DQuat::from_rotation_y(-20.0_f64.to_radians()),
+        glam::DVec3 {
+            x: 125.0,
+            y: 0.0,
+            z: 100.0,
+        },
+    );
+    world.add(Arc::new(Object::MatTransform(MatTransform::new(
+        box0_mat, box0,
+    ))));
 
     // let aluminum = Arc::new(Material::Metal(Metal::new(
     //     Color::new(0.8, 0.85, 0.88),
     //     0.0,
     // )));
-    // let box1 = Arc::new(Object::RectBox(RectBox::new(
-    //     &Point::new(265.0, 0.0, 295.0),
-    //     &Point::new(430.0, 330.0, 460.0),
-    //     white.clone(),
-    // )));
+
     let box1 = Arc::new(Object::RectBox(RectBox::new(
         &Point::new(0.0, 0.0, 0.0),
         &Point::new(165.0, 330.0, 165.0),
         white.clone(),
     )));
-    let mat = glam::DMat4::from_rotation_translation(
+    let box1_mat = glam::DMat4::from_rotation_translation(
         glam::DQuat::from_rotation_y(15.0_f64.to_radians()),
         glam::DVec3 {
-            x: 275.0,
+            x: 250.0,
             y: 0.0,
             z: 300.0,
         },
     );
-    let mat_transform = Object::MatTransform(MatTransform::new(mat, box1));
-    world.add(Arc::new(mat_transform));
-
-    // let glass = Arc::new(Material::Dielectric(Dielectric::new(1.5)));
-    let earth_texture = Arc::new(Texture::ImageTexture(ImageTexture::new(
-        "earthmap.png".to_string(),
-    )));
-    let earth_surface = Arc::new(Material::Lambertain(Lambertain::from_texture(
-        earth_texture,
-    )));
-    let sphere_obj = Arc::new(Object::Sphere(Sphere::new(
-        Point::new(190.0, 190.0, 190.0),
-        90.0,
-        earth_surface,
-    )));
-
-    let sphere_mat = glam::DMat4::from_scale(glam::DVec3 {
-        x: 1.0,
-        y: 1.5,
-        z: 1.0,
-    });
-    world.add(Arc::new(Object::MatTransform(MatTransform::new(
-        sphere_mat, sphere_obj,
-    ))));
+    let box1_mat_transform = Object::MatTransform(MatTransform::new(box1_mat, box1));
+    world.add(Arc::new(box1_mat_transform));
 
     // world.add(sphere_obj);
 
