@@ -28,6 +28,10 @@ impl Image {
         let mut g = color.y;
         let mut b = color.z;
 
+        r = if r.is_nan() { 0.0 } else { r };
+        g = if g.is_nan() { 0.0 } else { g };
+        b = if b.is_nan() { 0.0 } else { b };
+
         let scale = 1.0 / (self.samples as f64);
         r = (r * scale).sqrt();
         g = (g * scale).sqrt();

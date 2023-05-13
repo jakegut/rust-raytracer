@@ -1,168 +1,123 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
-use std::sync::{Arc, Mutex, RwLock, RwLockReadGuard};
+
+use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::time::Instant;
 
 use eframe::{egui, Error};
 use egui::{Color32, ColorImage, Vec2};
 use rayon::ThreadPoolBuilder;
-use rust_raytracer::bvh::BVHNode;
+
 use rust_raytracer::hittable::Hittable;
-use rust_raytracer::material::{Material, Scatterable};
+use rust_raytracer::material::Scatterable;
 use rust_raytracer::object::Object;
+use rust_raytracer::pdf::{CosinePDF, HittablePDF, MixturePDF, PDF};
 use rust_raytracer::ray::Ray;
-use rust_raytracer::utils::random_double;
+use rust_raytracer::scenes::{new_scene, SceneConfig};
 
 use rust_raytracer::camera::Camera;
-use rust_raytracer::hittable_list::HittableList;
+
 use rust_raytracer::image::Image;
-use rust_raytracer::material::{Dielectric, Lambertain, Metal};
-use rust_raytracer::sphere::{MovingSphere, Sphere};
-use rust_raytracer::utils::random_double_normal;
-use rust_raytracer::vec3::{Color, Point, Vec3};
 
-fn random_scene() -> HittableList {
-    let mut world = HittableList::new();
+use rust_raytracer::utils::{random_double, random_double_normal};
+use rust_raytracer::vec3::{Color, Point};
 
-    let ground_mat = Arc::new(Material::Lambertain(Lambertain::new(Color::new(
-        0.5, 0.5, 0.5,
-    ))));
-    world.add(Arc::new(Object::Sphere(Sphere::new(
-        Point::new(0.0, -1000.0, 0.0),
-        1000.0,
-        ground_mat,
-    ))));
-
-    for a in -11..11 {
-        for b in -11..11 {
-            let choose_mat = random_double_normal();
-            let center = Point::new(
-                (a as f64) + 0.9 * random_double_normal(),
-                0.2,
-                (b as f64) + 0.9 * random_double_normal(),
-            );
-
-            if (center - Point::new(4.0, 0.2, 0.0)).length() > 0.9 {
-                if choose_mat < 0.8 {
-                    let albedo = Color::random_normal() * Color::random_normal();
-                    let mat = Arc::new(Material::Lambertain(Lambertain::new(albedo)));
-                    let center1 = center + Vec3::new(0.0, random_double(0.0, 0.5), 0.0);
-                    world.add(Arc::new(Object::MovingSphere(MovingSphere::new(
-                        (center, center1),
-                        (0.0, 1.0),
-                        0.2,
-                        mat,
-                    ))));
-                } else if choose_mat < 0.95 {
-                    let albedo = Color::random(0.5, 1.0);
-                    let fuzz = random_double(0.0, 0.5);
-                    let mat = Arc::new(Material::Metal(Metal::new(albedo, fuzz)));
-                    world.add(Arc::new(Object::Sphere(Sphere::new(center, 0.2, mat))));
-                } else {
-                    let mat = Arc::new(Material::Dielectric(Dielectric::new(1.5)));
-                    world.add(Arc::new(Object::Sphere(Sphere::new(center, 0.2, mat))));
-                }
-            }
-        }
-    }
-
-    let mat1 = Arc::new(Material::Dielectric(Dielectric::new(1.5)));
-    world.add(Arc::new(Object::Sphere(Sphere::new(
-        Point::new(0.0, 1.0, 0.0),
-        1.0,
-        mat1,
-    ))));
-
-    let mat2 = Arc::new(Material::Lambertain(Lambertain::new(Color::new(
-        0.4, 0.2, 0.1,
-    ))));
-    world.add(Arc::new(Object::Sphere(Sphere::new(
-        Point::new(-4.0, 1.0, 0.0),
-        1.0,
-        mat2,
-    ))));
-
-    let mat3 = Arc::new(Material::Metal(Metal::new(Color::new(0.7, 0.6, 0.5), 0.0)));
-    world.add(Arc::new(Object::Sphere(Sphere::new(
-        Point::new(4.0, 1.0, 0.0),
-        1.0,
-        mat3,
-    ))));
-
-    world
-}
-
-fn ray_color(r: &Ray, world: &Object, depth: u32) -> Color {
+fn ray_color(
+    r: &Ray,
+    world: &Object,
+    lights: Arc<Object>,
+    background: &Color,
+    depth: u32,
+) -> Color {
     if depth <= 0 {
         return Color::default();
     }
 
     match world.hit(&r, 0.001, f64::MAX) {
         Some(rec) => {
+            let emitted = rec.mat.emitted(&r, &rec, rec.uv.0, rec.uv.1, &rec.p);
             let mat = rec.clone().mat;
             match mat.scatter(&r, &rec) {
-                Some((Some(scattered), attenuation)) => {
-                    attenuation * ray_color(&scattered, world, depth - 1)
+                Some(srec) => {
+                    let light_pdf = Arc::new(HittablePDF::new(rec.p, lights.clone()));
+                    // let scattered = Ray::new(rec.p, light_pdf.generate()).with_time(r.time);
+                    // let pdf_val = light_pdf.value(&scattered.dir);
+
+                    if let Some(specular_ray) = srec.specular_ray {
+                        return srec.attenuation
+                            * ray_color(
+                                &specular_ray,
+                                world,
+                                lights.clone(),
+                                background,
+                                depth - 1,
+                            );
+                    }
+
+                    let pdf: MixturePDF = match srec.pdf_ptr {
+                        Some(pdf_ptr) => MixturePDF::new(light_pdf, pdf_ptr.clone()),
+                        None => MixturePDF::new(light_pdf.clone(), light_pdf.clone()),
+                    };
+
+                    let scattered = Ray::new(rec.p, pdf.generate()).with_time(r.time);
+                    let pdf_val = pdf.value(&scattered.dir);
+
+                    let scat_pdf = match rec.mat.scatter_pdf(&r, &rec, &scattered) {
+                        Some(v) => v,
+                        None => 0.0,
+                    };
+
+                    emitted
+                        + srec.attenuation
+                            * scat_pdf
+                            * ray_color(&scattered, world, lights.clone(), background, depth - 1)
+                            / pdf_val
                 }
-                None => Color::new_empty(),
-                Some((None, _)) => todo!(),
+                None => emitted,
             }
         }
-        None => {
-            let unit_dir = r.dir.unit();
-            let t = 0.5 * (unit_dir.y + 1.0);
-            (1.0 - t) * Color::new(1.0, 1.0, 1.0) + t * Color::new(0.5, 0.7, 1.0)
-        }
+        None => *background,
     }
 }
 
-fn raytrace(image_width: usize, aspect_ratio: f64, frame: Arc<RwLock<ColorImage>>) {
-    let image_height: usize = (image_width as f64 / aspect_ratio) as usize;
-    const SAMPLES_PER_PIXEL: u32 = 100;
-    const MAX_DEPTH: u32 = 5;
+fn raytrace(image_width: usize, scene_config: Arc<SceneConfig>, frame: Arc<RwLock<ColorImage>>) {
+    let image_height: usize = (image_width as f64 / scene_config.aspect_ratio) as usize;
+    let samples_per_pixel: u32 = 100;
+    const MAX_DEPTH: u32 = 50;
 
-    let world = Object::BVHNode(BVHNode::new(&mut random_scene(), (0.0, 1.0)));
-    // let world = Object::HittableList(random_scene());
+    let world = &scene_config.world;
     let arc_world = Arc::new(world);
 
-    let image: Image = Image::new(image_width, image_height, SAMPLES_PER_PIXEL, frame);
+    let image: Image = Image::new(image_width, image_height, samples_per_pixel, frame);
     let arc_image = Arc::new(Mutex::new(image));
 
-    let lookfrom = Vec3::new(13.0, 2.0, 3.0);
-    let lookat = Vec3::new(0.0, 0.0, 0.0);
-    let vup = Vec3::new(0.0, 1.0, 0.0);
-    let dist_to_focus = 10.0;
-    let aperature = 0.1;
+    let lights = scene_config.lights.clone();
 
     let camera = Arc::new(
         Camera::new(
-            lookfrom,
-            lookat,
-            vup,
-            20.0,
-            aspect_ratio,
-            aperature,
-            dist_to_focus,
+            scene_config.lookfrom,
+            scene_config.lookat,
+            scene_config.vup,
+            scene_config.vfov,
+            scene_config.aspect_ratio,
+            scene_config.aperture,
+            scene_config.dist_to_focus,
         )
         .with_time(0.0, 1.0),
     );
 
-    // let mut row_colors = Vec::with_capacity(image_height);
-    // row_colors.resize_with(image_height, || RowColors { row: vec![] });
-
-    // let rows: Arc<Mutex<Vec<RowColors>>> = Arc::new(Mutex::new(row_colors));
-
     let pool = ThreadPoolBuilder::new().num_threads(12).build().unwrap();
 
     let start = Instant::now();
+    let background = scene_config.background;
     pool.scope(|s| {
         for j in 0..image_height {
             let arc_world = arc_world.clone();
             let camera = camera.clone();
-            // let rows = rows.clone();
             let image = arc_image.clone();
+            let arc_lights = lights.clone();
             s.spawn(move |_| {
-                let mut colors = vec![Color::new(SAMPLES_PER_PIXEL as f64, 0.0, 0.0); image_width];
+                let mut colors = vec![Color::new(samples_per_pixel as f64, 0.0, 0.0); image_width];
                 let mut img = image.lock().unwrap();
                 for (i, color) in colors.iter().enumerate() {
                     img.append_color(color, i, image_height - j - 1);
@@ -170,11 +125,12 @@ fn raytrace(image_width: usize, aspect_ratio: f64, frame: Arc<RwLock<ColorImage>
                 drop(img);
                 for i in 0..image_width {
                     let mut pixel_color = Color::default();
-                    for _s in 0..SAMPLES_PER_PIXEL {
+                    for _s in 0..samples_per_pixel {
                         let u = ((i as f64) + random_double_normal()) / (image_width - 1) as f64;
                         let v = ((j as f64) + random_double_normal()) / (image_height - 1) as f64;
                         let r = camera.get_ray(u, v);
-                        pixel_color += ray_color(&r, arc_world.as_ref(), MAX_DEPTH);
+                        pixel_color +=
+                            ray_color(&r, &arc_world, arc_lights.clone(), &background, MAX_DEPTH);
                     }
                     colors[i] = pixel_color;
                 }
@@ -182,28 +138,17 @@ fn raytrace(image_width: usize, aspect_ratio: f64, frame: Arc<RwLock<ColorImage>
                 for (i, color) in colors.iter().enumerate() {
                     img.append_color(color, i, image_height - j - 1);
                 }
-                // let mut data = rows.lock().unwrap();
-                // data[j] = RowColors { row: v };
-                // println!("finished {}", j);
             })
         }
     });
     let duration = start.elapsed();
     println!("Time elapsed in ray_trace() is: {:?}", duration);
-
-    // for row in rows.lock().unwrap().iter().rev() {
-    //     for color in &row.row {
-    //         image.append_color(*color)
-    //     }
-    // }
-
-    // image.write()
 }
 
 fn main() -> Result<(), Error> {
-    let width: usize = 600;
-    let aspect_ratio: f64 = 16.0 / 9.0;
-    let height = (width as f64 / aspect_ratio) as usize;
+    let width: usize = 800;
+    let scene_cfg = new_scene(0);
+    let height = (width as f64 / scene_cfg.aspect_ratio) as usize;
     let native_options = eframe::NativeOptions {
         initial_window_size: Some(Vec2::new(width as f32, height as f32)),
         renderer: eframe::Renderer::Glow,
@@ -213,7 +158,7 @@ fn main() -> Result<(), Error> {
     eframe::run_native(
         "My egui app",
         native_options,
-        Box::new(move |cc| Box::new(MyEguiApp::new(cc, width, aspect_ratio))),
+        Box::new(move |cc| Box::new(MyEguiApp::new(cc, width, Arc::new(scene_cfg)))),
     )
 }
 
@@ -227,26 +172,29 @@ struct MyEguiApp {
 }
 
 impl MyEguiApp {
-    fn new(_cc: &eframe::CreationContext<'_>, image_width: usize, aspect_ratio: f64) -> Self {
+    fn new(
+        _cc: &eframe::CreationContext<'_>,
+        image_width: usize,
+        scene_config: Arc<SceneConfig>,
+    ) -> Self {
         // Customize egui here with cc.egui_ctx.set_fonts and cc.egui_ctx.set_visuals.
         // Restore app state using cc.storage (requires the "persistence" feature).
         // Use the cc.gl (a glow::Context) to create graphics shaders and buffers that you can use
         // for e.g. egui::PaintCallback.
-        let height = (image_width as f64 / aspect_ratio) as usize;
+        let height = (image_width as f64 / scene_config.aspect_ratio) as usize;
         let frame_thing = Arc::new(RwLock::new(ColorImage::new(
             [image_width, height],
             Color32::BLACK,
         )));
         {
             let frame_thing = frame_thing.clone();
+            let scene_config = scene_config.clone();
             thread::spawn(move || {
-                raytrace(image_width, aspect_ratio, frame_thing);
+                raytrace(image_width, scene_config, frame_thing);
             });
         }
         Self {
             frame_thing: frame_thing.clone(),
-            image_width,
-            aspect_ratio,
             ..Default::default()
         }
     }

@@ -1949,6 +1949,7 @@ dependencies = [
  "eframe",
  "image",
  "rand",
+ "rand_chacha",
  "rayon",
  "rfd",
  "threadpool",

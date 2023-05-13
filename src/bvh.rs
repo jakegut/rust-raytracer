@@ -34,6 +34,7 @@ impl BVHNode {
         let mut rng = rand::thread_rng();
         let objects = src_objects;
         let axis: usize = rng.gen_range(0..=2);
+        // let axis = 2;
         let cmp = cmp_box(axis);
 
         let object_span = end - start;
@@ -54,7 +55,7 @@ impl BVHNode {
                 }
             },
             _ => {
-                objects.sort_by(|a, b| cmp(&a, &b));
+                objects[start..end].sort_by(|a, b| cmp(&a, &b));
                 let mid = start + object_span / 2;
                 left = Arc::new(Object::BVHNode(BVHNode::from_vec(
                     objects, start, mid, time,

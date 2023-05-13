@@ -1,51 +1,105 @@
+use std::{f64::consts::PI, sync::Arc};
+
 use crate::{
     hittable::HitRecord,
+    onb::ONB,
+    pdf::{CosinePDF, PDF},
     ray::Ray,
-    utils::random_double_normal,
-    vec3::{Color, Vec3},
+    texture::{SolidColor, Texture, TextureMat},
+    utils::{random_cosine_direction, random_double_normal},
+    vec3::{Color, Point, Vec3},
 };
 
 pub enum Material {
     Lambertain(Lambertain),
     Metal(Metal),
     Dielectric(Dielectric),
+    DiffuseLight(DiffuseLight),
 }
 
 impl Scatterable for Material {
-    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<(Option<Ray>, Vec3)> {
+    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord> {
         match self {
             Material::Lambertain(l) => l.scatter(ray_in, hit_record),
             Material::Metal(m) => m.scatter(ray_in, hit_record),
             Material::Dielectric(d) => d.scatter(ray_in, hit_record),
+            Material::DiffuseLight(dl) => dl.scatter(ray_in, hit_record),
+        }
+    }
+
+    fn emitted(&self, ray_in: &Ray, hit_record: &HitRecord, u: f64, v: f64, p: &Point) -> Color {
+        match self {
+            Material::Lambertain(l) => l.emitted(ray_in, hit_record, u, v, p),
+            Material::DiffuseLight(dl) => dl.emitted(ray_in, hit_record, u, v, p),
+            Material::Metal(m) => m.emitted(ray_in, hit_record, u, v, p),
+            Material::Dielectric(d) => d.emitted(ray_in, hit_record, u, v, p),
+        }
+    }
+
+    fn scatter_pdf(&self, ray_in: &Ray, hit_record: &HitRecord, scattered: &Ray) -> Option<f64> {
+        match self {
+            Material::Lambertain(l) => l.scatter_pdf(ray_in, hit_record, scattered),
+            Material::DiffuseLight(dl) => dl.scatter_pdf(ray_in, hit_record, scattered),
+            Material::Metal(m) => m.scatter_pdf(ray_in, hit_record, scattered),
+            Material::Dielectric(d) => d.scatter_pdf(ray_in, hit_record, scattered),
         }
     }
 }
 
+pub struct ScatterRecord {
+    pub specular_ray: Option<Ray>,
+    pub attenuation: Color,
+    pub pdf_ptr: Option<Arc<dyn PDF>>,
+}
+
 pub trait Scatterable {
-    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<(Option<Ray>, Color)>;
+    fn scatter(&self, _ray_in: &Ray, _hit_record: &HitRecord) -> Option<ScatterRecord> {
+        None
+    }
+
+    fn scatter_pdf(&self, _ray_in: &Ray, _hit_record: &HitRecord, _scattered: &Ray) -> Option<f64> {
+        None
+    }
+
+    fn emitted(&self, ray_in: &Ray, hit_record: &HitRecord, _u: f64, _v: f64, _p: &Point) -> Color {
+        Color::new_empty()
+    }
 }
 
 #[derive(Default)]
 pub struct Lambertain {
-    albedo: Color,
+    albedo: Arc<Texture>,
 }
 
 impl Lambertain {
     pub fn new(albedo: Color) -> Self {
-        Self { albedo }
+        Self {
+            albedo: Arc::new(Texture::SolidColor(SolidColor::new(
+                albedo.x, albedo.y, albedo.z,
+            ))),
+        }
+    }
+
+    pub fn from_texture(tx: Arc<Texture>) -> Self {
+        Self { albedo: tx }
     }
 }
 
 impl Scatterable for Lambertain {
-    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<(Option<Ray>, Color)> {
-        let mut scatter_dir = hit_record.normal + Vec3::random_unit_vector();
-        if scatter_dir.near_zero() {
-            scatter_dir = hit_record.normal;
-        }
-        Some((
-            Some(Ray::new(hit_record.p, scatter_dir).with_time(ray_in.time)),
-            self.albedo,
-        ))
+    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord> {
+        let scatter_record = ScatterRecord {
+            specular_ray: None,
+            attenuation: self
+                .albedo
+                .value(hit_record.uv.0, hit_record.uv.1, &hit_record.p),
+            pdf_ptr: Some(Arc::new(CosinePDF::new(&hit_record.normal))),
+        };
+        Some(scatter_record)
+    }
+
+    fn scatter_pdf(&self, _ray_in: &Ray, hit_record: &HitRecord, scattered: &Ray) -> Option<f64> {
+        let cos = hit_record.normal.dot(scattered.dir.unit());
+        Some(if cos < 0.0 { 0.0 } else { cos / PI })
     }
 }
 
@@ -64,18 +118,17 @@ impl Metal {
 }
 
 impl Scatterable for Metal {
-    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<(Option<Ray>, Color)> {
+    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord> {
         let reflected = ray_in.dir.unit().reflect(hit_record.normal);
-        let scattered = Ray::new(
-            hit_record.p,
-            reflected + self.fuzz * Vec3::random_in_unit_sphere(),
-        )
-        .with_time(ray_in.time);
-        if scattered.dir.dot(hit_record.normal) > 0.0 {
-            Some((Some(scattered), self.albedo))
-        } else {
-            None
-        }
+        let record = ScatterRecord {
+            specular_ray: Some(Ray::new(
+                hit_record.p,
+                reflected + self.fuzz * Vec3::random_in_unit_sphere(),
+            )),
+            attenuation: self.albedo,
+            pdf_ptr: None,
+        };
+        Some(record)
     }
 }
 
@@ -96,7 +149,7 @@ impl Dielectric {
 }
 
 impl Scatterable for Dielectric {
-    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<(Option<Ray>, Color)> {
+    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord> {
         let refraction_ratio = if hit_record.front_face {
             1.0 / self.ir
         } else {
@@ -117,9 +170,42 @@ impl Scatterable for Dielectric {
             unit_vec.refract(hit_record.normal, refraction_ratio)
         };
 
-        Some((
-            Some(Ray::new(hit_record.p, direction).with_time(ray_in.time)),
-            Color::new(1.0, 1.0, 1.0),
-        ))
+        let record = ScatterRecord {
+            attenuation: Color::new(1.0, 1.0, 1.0),
+            specular_ray: Some(Ray::new(hit_record.p, direction).with_time(ray_in.time)),
+            pdf_ptr: None,
+        };
+
+        Some(record)
+    }
+}
+
+pub struct DiffuseLight {
+    emit: Arc<Texture>,
+}
+
+impl DiffuseLight {
+    pub fn new(texture: Arc<Texture>) -> Self {
+        Self { emit: texture }
+    }
+
+    pub fn from_color(c: &Color) -> Self {
+        Self {
+            emit: Arc::new(Texture::SolidColor(SolidColor::from_color(c))),
+        }
+    }
+}
+
+impl Scatterable for DiffuseLight {
+    fn emitted(&self, _ray_in: &Ray, hit_record: &HitRecord, u: f64, v: f64, p: &Point) -> Color {
+        if hit_record.front_face {
+            self.emit.value(u, v, p)
+        } else {
+            Color::new_empty()
+        }
+    }
+
+    fn scatter(&self, _ray_in: &Ray, _hit_record: &HitRecord) -> Option<ScatterRecord> {
+        None
     }
 }

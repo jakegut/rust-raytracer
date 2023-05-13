@@ -7,8 +7,9 @@ edition = "2021"
 
 [dependencies]
 eframe = { version="0.21.3", features = ["glow"]}
-rand = "0.8.5"
+rand = { version="0.8.5", features= ["small_rng"]}
 rayon = "1.7.0"
 rfd = "0.11.3"
 threadpool = "1.8.1"
 image = { version = "0.24", default-features = false, features = ["png"] }
+rand_chacha = "0.3.1"
