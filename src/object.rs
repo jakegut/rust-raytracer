@@ -1,3 +1,5 @@
+use std::{sync::Arc, vec};
+
 use crate::{
     aabb::AABB,
     bvh::BVHNode,
@@ -30,6 +32,16 @@ impl Default for Object {
 }
 
 impl Object {
+    pub fn get_lights(&self) -> Vec<Arc<Object>> {
+        match self {
+            Object::BVHNode(n) => n.get_lights(),
+            Object::HittableList(hl) => hl.get_lights(),
+            _ => {
+                vec![]
+            }
+        }
+    }
+
     pub fn is_light(&self) -> bool {
         match self {
             Object::FlipFace(ff) => ff.ptr.is_light(),

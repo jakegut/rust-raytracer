@@ -8,6 +8,7 @@ use crate::{
     hittable_list::HittableList,
     object::Object,
     ray::Ray,
+    utils::get_all_lights,
 };
 
 pub struct BVHNode {
@@ -81,6 +82,10 @@ impl BVHNode {
             },
             _ => unreachable!(),
         }
+    }
+
+    pub fn get_lights(&self) -> Vec<Arc<Object>> {
+        get_all_lights(&vec![self.left.clone(), self.right.clone()])
     }
 }
 

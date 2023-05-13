@@ -86,12 +86,7 @@ pub fn new_scene(choice: u32) -> SceneConfig {
         ),
     };
 
-    let lights: Vec<Arc<Object>> = world
-        .objects
-        .iter()
-        .filter(|&o| o.is_light())
-        .cloned()
-        .collect();
+    let lights = world.get_lights();
     let lights_hittable = Object::HittableList(HittableList { objects: lights });
     cfg.world = Object::HittableList(world);
     cfg.lights = lights_hittable.into();
@@ -153,11 +148,11 @@ fn cornell_box() -> HittableList {
         white.clone(),
     ))));
 
-    world.add(Arc::new(Object::RectBox(RectBox::new(
-        &Point::new(130.0, 0.0, 65.0),
-        &Point::new(295.0, 165.0, 230.0),
-        white.clone(),
-    ))));
+    // world.add(Arc::new(Object::RectBox(RectBox::new(
+    //     &Point::new(130.0, 0.0, 65.0),
+    //     &Point::new(295.0, 165.0, 230.0),
+    //     white.clone(),
+    // ))));
 
     // let aluminum = Arc::new(Material::Metal(Metal::new(
     //     Color::new(0.8, 0.85, 0.88),
@@ -185,20 +180,26 @@ fn cornell_box() -> HittableList {
     world.add(Arc::new(mat_transform));
 
     // let glass = Arc::new(Material::Dielectric(Dielectric::new(1.5)));
-    // let sphere_obj = Arc::new(Object::Sphere(Sphere::new(
-    //     Point::new(190.0, 190.0, 190.0),
-    //     90.0,
-    //     glass,
-    // )));
+    let earth_texture = Arc::new(Texture::ImageTexture(ImageTexture::new(
+        "earthmap.png".to_string(),
+    )));
+    let earth_surface = Arc::new(Material::Lambertain(Lambertain::from_texture(
+        earth_texture,
+    )));
+    let sphere_obj = Arc::new(Object::Sphere(Sphere::new(
+        Point::new(190.0, 190.0, 190.0),
+        90.0,
+        earth_surface,
+    )));
 
-    // let sphere_mat = glam::DMat4::from_scale(glam::DVec3 {
-    //     x: 1.0,
-    //     y: 1.5,
-    //     z: 1.0,
-    // });
-    // world.add(Arc::new(Object::MatTransform(MatTransform::new(
-    //     sphere_mat, sphere_obj,
-    // ))));
+    let sphere_mat = glam::DMat4::from_scale(glam::DVec3 {
+        x: 1.0,
+        y: 1.5,
+        z: 1.0,
+    });
+    world.add(Arc::new(Object::MatTransform(MatTransform::new(
+        sphere_mat, sphere_obj,
+    ))));
 
     // world.add(sphere_obj);
 

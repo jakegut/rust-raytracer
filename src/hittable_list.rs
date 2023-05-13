@@ -7,6 +7,7 @@ use crate::{
     aabb::AABB,
     hittable::{HitRecord, Hittable},
     object::Object,
+    utils::get_all_lights,
 };
 
 #[derive(Clone)]
@@ -33,6 +34,10 @@ impl HittableList {
 
     pub fn add(&mut self, object: Arc<Object>) {
         self.objects.push(object)
+    }
+
+    pub fn get_lights(&self) -> Vec<Arc<Object>> {
+        get_all_lights(&self.objects)
     }
 }
 

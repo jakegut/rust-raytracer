@@ -1,8 +1,8 @@
-use std::f64::consts::PI;
+use std::{f64::consts::PI, sync::Arc};
 
 use rand::Rng;
 
-use crate::vec3::Vec3;
+use crate::{object::Object, vec3::Vec3};
 
 pub fn random_double_normal() -> f64 {
     let mut rng = rand::thread_rng();
@@ -33,4 +33,17 @@ pub fn clamp(x: f64, min: f64, max: f64) -> f64 {
     } else {
         x
     }
+}
+
+pub fn get_all_lights(v: &Vec<Arc<Object>>) -> Vec<Arc<Object>> {
+    v.iter()
+        .flat_map(|o| {
+            if o.is_light() {
+                vec![o.clone()]
+            } else {
+                o.get_lights()
+            }
+        })
+        .clone()
+        .collect()
 }

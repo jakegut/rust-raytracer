@@ -105,7 +105,19 @@ impl MatTransform {
 
 impl Hittable for MatTransform {
     fn bounding_box(&self, time: (f64, f64)) -> Option<AABB> {
-        self.ptr.bounding_box(time)
+        let aabb = self.ptr.bounding_box(time);
+
+        match aabb {
+            None => None,
+            Some(aabb) => {
+                let mat = self.mat_i.inverse();
+
+                Some(AABB {
+                    min: mat.transform_point3(aabb.min.into()).into(),
+                    max: mat.transform_point3(aabb.max.into()).into(),
+                })
+            }
+        }
     }
 
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
