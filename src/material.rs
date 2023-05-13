@@ -8,6 +8,7 @@ use crate::{
     texture::{SolidColor, Texture, TextureMat},
     utils::{random_cosine_direction, random_double_normal},
     vec3::{Color, Point, Vec3},
+    BIAS,
 };
 
 pub enum Material {
@@ -172,7 +173,9 @@ impl Scatterable for Dielectric {
 
         let record = ScatterRecord {
             attenuation: Color::new(1.0, 1.0, 1.0),
-            specular_ray: Some(Ray::new(hit_record.p, direction).with_time(ray_in.time)),
+            specular_ray: Some(
+                Ray::new(hit_record.p + hit_record.normal * BIAS, direction).with_time(ray_in.time),
+            ),
             pdf_ptr: None,
         };
 

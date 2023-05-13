@@ -13,6 +13,18 @@ pub trait PDF {
     fn generate(&self) -> Vec3;
 }
 
+pub struct NullPDF;
+
+impl PDF for NullPDF {
+    fn generate(&self) -> Vec3 {
+        Vec3::random_unit_vector()
+    }
+
+    fn value(&self, _dir: &Vec3) -> f64 {
+        0.0
+    }
+}
+
 pub struct CosinePDF {
     uvw: ONB,
 }

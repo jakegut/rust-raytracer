@@ -1,5 +1,7 @@
 use std::ops::{Add, AddAssign, Div, DivAssign, Index, Mul, MulAssign, Neg, Sub};
 
+use glam::DVec3;
+
 use crate::utils::{random_double, random_double_normal};
 
 #[derive(Debug, Clone, Copy)]
@@ -231,6 +233,26 @@ impl Index<usize> for Vec3 {
             1 => &self.y,
             2 => &self.z,
             _ => unreachable!(),
+        }
+    }
+}
+
+impl From<glam::DVec3> for Vec3 {
+    fn from(value: glam::DVec3) -> Self {
+        Self {
+            x: value.x,
+            y: value.y,
+            z: value.z,
+        }
+    }
+}
+
+impl Into<glam::DVec3> for Vec3 {
+    fn into(self) -> glam::DVec3 {
+        DVec3 {
+            x: self.x,
+            y: self.y,
+            z: self.z,
         }
     }
 }

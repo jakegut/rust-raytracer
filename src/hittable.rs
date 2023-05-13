@@ -1,7 +1,9 @@
+use glam::DVec3;
+
 use crate::{
     aabb::AABB,
     material::{Lambertain, Material},
-    object::Object,
+    object::{self, Object},
     pdf::PDF,
     ray::Ray,
     vec3::{Color, Point, Vec3},
@@ -84,5 +86,75 @@ impl Hittable for FlipFace {
 
     fn random(&self, o: &Vec3) -> Vec3 {
         self.ptr.random(o)
+    }
+}
+
+pub struct MatTransform {
+    pub mat_i: glam::DMat4,
+    pub ptr: Arc<Object>,
+}
+
+impl MatTransform {
+    pub fn new(mat: glam::DMat4, ptr: Arc<Object>) -> Self {
+        Self {
+            mat_i: mat.inverse(),
+            ptr,
+        }
+    }
+}
+
+impl Hittable for MatTransform {
+    fn bounding_box(&self, time: (f64, f64)) -> Option<AABB> {
+        self.ptr.bounding_box(time)
+    }
+
+    fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
+        let osd = self.mat_i.transform_vector3(r.dir.into());
+
+        let oso = self.mat_i.transform_point3(r.orig.into());
+
+        let object_space_ray = Ray::new(
+            Vec3::new(oso.x, oso.y, oso.z),
+            Vec3::new(osd.x, osd.y, osd.z),
+        );
+
+        match self.ptr.hit(&object_space_ray, t_min, t_max) {
+            None => None,
+            Some(rec) => {
+                let world_space_mat = self.mat_i.transpose();
+                let world_normal = Vec3::from(world_space_mat.transform_vector3(rec.normal.into()));
+                // let world_t = (r.orig
+                //     - Vec3::from(self.mat.transform_point3(object_space_ray.at(rec.t).into())))
+                // .length();
+                let world_p = Vec3::from(self.mat_i.inverse().transform_point3(rec.p.into()));
+
+                Some(HitRecord {
+                    p: world_p,
+                    normal: world_normal,
+                    t: rec.t,
+                    uv: rec.uv,
+                    front_face: rec.front_face,
+                    mat: rec.mat,
+                })
+            }
+        }
+    }
+
+    fn pdf_value(&self, o: &Point, v: &Point) -> f64 {
+        let object_o = Vec3::from(self.mat_i.transform_point3((*o).into()));
+        let object_v = Vec3::from(self.mat_i.transform_point3((*v).into()));
+
+        self.ptr.pdf_value(&object_o, &object_v)
+        // self.ptr.pdf_value(o, v)
+    }
+
+    fn random(&self, o: &Vec3) -> Vec3 {
+        let object_o = Vec3::from(self.mat_i.transform_vector3((*o).into()));
+        Vec3::from(
+            self.mat_i
+                .inverse()
+                .transform_vector3(self.ptr.random(&object_o).into()),
+        )
+        // self.ptr.random(o)
     }
 }

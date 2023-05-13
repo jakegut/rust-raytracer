@@ -11,9 +11,10 @@ use rayon::ThreadPoolBuilder;
 use rust_raytracer::hittable::Hittable;
 use rust_raytracer::material::Scatterable;
 use rust_raytracer::object::Object;
-use rust_raytracer::pdf::{CosinePDF, HittablePDF, MixturePDF, PDF};
+use rust_raytracer::pdf::{CosinePDF, HittablePDF, MixturePDF, NullPDF, PDF};
 use rust_raytracer::ray::Ray;
 use rust_raytracer::scenes::{new_scene, SceneConfig};
+use rust_raytracer::BIAS;
 
 use rust_raytracer::camera::Camera;
 
@@ -56,10 +57,11 @@ fn ray_color(
 
                     let pdf: MixturePDF = match srec.pdf_ptr {
                         Some(pdf_ptr) => MixturePDF::new(light_pdf, pdf_ptr.clone()),
-                        None => MixturePDF::new(light_pdf.clone(), light_pdf.clone()),
+                        None => MixturePDF::new(light_pdf.clone(), Arc::new(NullPDF {})),
                     };
 
-                    let scattered = Ray::new(rec.p, pdf.generate()).with_time(r.time);
+                    let scattered =
+                        Ray::new(rec.p + rec.normal * BIAS, pdf.generate()).with_time(r.time);
                     let pdf_val = pdf.value(&scattered.dir);
 
                     let scat_pdf = match rec.mat.scatter_pdf(&r, &rec, &scattered) {
@@ -82,8 +84,8 @@ fn ray_color(
 
 fn raytrace(image_width: usize, scene_config: Arc<SceneConfig>, frame: Arc<RwLock<ColorImage>>) {
     let image_height: usize = (image_width as f64 / scene_config.aspect_ratio) as usize;
-    let samples_per_pixel: u32 = 100;
-    const MAX_DEPTH: u32 = 50;
+    let samples_per_pixel: u32 = 5;
+    const MAX_DEPTH: u32 = 3;
 
     let world = &scene_config.world;
     let arc_world = Arc::new(world);

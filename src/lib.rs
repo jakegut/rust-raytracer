@@ -15,3 +15,5 @@ pub mod sphere;
 pub mod texture;
 pub mod utils;
 pub mod vec3;
+
+pub const BIAS: f64 = f64::EPSILON;

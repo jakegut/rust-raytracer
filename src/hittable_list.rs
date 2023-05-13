@@ -1,3 +1,4 @@
+use core::panic;
 use std::sync::Arc;
 
 use rand::{thread_rng, Rng};
@@ -89,12 +90,14 @@ impl Hittable for HittableList {
 
         for object in self.objects.iter() {
             sum += wt * object.pdf_value(o, v)
-        };
+        }
         sum
-
     }
 
     fn random(&self, o: &crate::vec3::Vec3) -> crate::vec3::Vec3 {
+        if self.objects.len() == 0 {
+            panic!("empty hittable list!")
+        }
         let mut rng = thread_rng();
         let size = self.objects.len();
         let r: usize = rng.gen_range(0..size);

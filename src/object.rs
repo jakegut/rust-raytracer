@@ -1,7 +1,7 @@
 use crate::{
     aabb::AABB,
     bvh::BVHNode,
-    hittable::{FlipFace, HitRecord, Hittable},
+    hittable::{FlipFace, HitRecord, Hittable, MatTransform},
     hittable_list::HittableList,
     material::Material,
     rect::{RectBox, XYRect, XZRect, YZRect},
@@ -20,6 +20,7 @@ pub enum Object {
     RectBox(RectBox),
 
     FlipFace(FlipFace),
+    MatTransform(MatTransform),
 }
 
 impl Default for Object {
@@ -32,6 +33,7 @@ impl Object {
     pub fn is_light(&self) -> bool {
         match self {
             Object::FlipFace(ff) => ff.ptr.is_light(),
+            Object::MatTransform(mt) => mt.ptr.is_light(),
             _ => {
                 let mat = match self {
                     Object::XZRect(r) => Some(r.mat.clone()),
@@ -65,6 +67,7 @@ impl Hittable for Object {
             Object::XZRect(rect) => rect.hit(r, t_min, t_max),
             Object::RectBox(rect) => rect.hit(r, t_min, t_max),
             Object::FlipFace(ff) => ff.hit(r, t_min, t_max),
+            Object::MatTransform(mt) => mt.hit(r, t_min, t_max),
         }
     }
 
@@ -79,6 +82,7 @@ impl Hittable for Object {
             Object::XZRect(rect) => rect.bounding_box(time),
             Object::RectBox(rect) => rect.bounding_box(time),
             Object::FlipFace(ff) => ff.bounding_box(time),
+            Object::MatTransform(mt) => mt.bounding_box(time),
         }
     }
 
@@ -93,6 +97,7 @@ impl Hittable for Object {
             Object::XZRect(rect) => rect.pdf_value(o, v),
             Object::RectBox(rect) => rect.pdf_value(o, v),
             Object::FlipFace(ff) => ff.pdf_value(o, v),
+            Object::MatTransform(mt) => mt.pdf_value(o, v),
         }
     }
 
@@ -107,6 +112,7 @@ impl Hittable for Object {
             Object::XZRect(rect) => rect.random(o),
             Object::RectBox(rect) => rect.random(o),
             Object::FlipFace(ff) => ff.random(o),
+            Object::MatTransform(mt) => mt.random(o),
         }
     }
 }

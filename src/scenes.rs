@@ -1,7 +1,8 @@
-use std::sync::Arc;
+use std::{f64::consts::PI, sync::Arc};
 
 use crate::{
-    hittable::FlipFace,
+    bvh::BVHNode,
+    hittable::{FlipFace, MatTransform},
     hittable_list::HittableList,
     material::{Dielectric, DiffuseLight, Lambertain, Material, Metal},
     object::Object,
@@ -152,28 +153,71 @@ fn cornell_box() -> HittableList {
         white.clone(),
     ))));
 
-    // world.add(Arc::new(Object::RectBox(RectBox::new(
-    //     &Point::new(130.0, 0.0, 65.0),
-    //     &Point::new(295.0, 165.0, 230.0),
-    //     white.clone(),
-    // ))));
+    world.add(Arc::new(Object::RectBox(RectBox::new(
+        &Point::new(130.0, 0.0, 65.0),
+        &Point::new(295.0, 165.0, 230.0),
+        white.clone(),
+    ))));
 
     // let aluminum = Arc::new(Material::Metal(Metal::new(
     //     Color::new(0.8, 0.85, 0.88),
     //     0.0,
     // )));
-    world.add(Arc::new(Object::RectBox(RectBox::new(
-        &Point::new(265.0, 0.0, 295.0),
-        &Point::new(430.0, 330.0, 460.0),
+    // let box1 = Arc::new(Object::RectBox(RectBox::new(
+    //     &Point::new(265.0, 0.0, 295.0),
+    //     &Point::new(430.0, 330.0, 460.0),
+    //     white.clone(),
+    // )));
+    let box1 = Arc::new(Object::RectBox(RectBox::new(
+        &Point::new(0.0, 0.0, 0.0),
+        &Point::new(165.0, 330.0, 165.0),
         white.clone(),
-    ))));
+    )));
+    let mat = glam::DMat4::from_rotation_translation(
+        glam::DQuat::from_rotation_y(15.0_f64.to_radians()),
+        glam::DVec3 {
+            x: 275.0,
+            y: 0.0,
+            z: 300.0,
+        },
+    );
+    let mat_transform = Object::MatTransform(MatTransform::new(mat, box1));
+    world.add(Arc::new(mat_transform));
 
-    let glass = Arc::new(Material::Dielectric(Dielectric::new(1.5)));
-    world.add(Arc::new(Object::Sphere(Sphere::new(
-        Point::new(190.0, 190.0, 190.0),
-        90.0,
-        glass,
-    ))));
+    // let glass = Arc::new(Material::Dielectric(Dielectric::new(1.5)));
+    // let sphere_obj = Arc::new(Object::Sphere(Sphere::new(
+    //     Point::new(190.0, 190.0, 190.0),
+    //     90.0,
+    //     glass,
+    // )));
+
+    // let sphere_mat = glam::DMat4::from_scale(glam::DVec3 {
+    //     x: 1.0,
+    //     y: 1.5,
+    //     z: 1.0,
+    // });
+    // world.add(Arc::new(Object::MatTransform(MatTransform::new(
+    //     sphere_mat, sphere_obj,
+    // ))));
+
+    // world.add(sphere_obj);
+
+    // let light_mat = glam::DMat4::from_rotation_translation(
+    //     glam::DQuat::from_rotation_x(PI),
+    //     glam::DVec3 {
+    //         x: 200.0,
+    //         y: 150.0,
+    //         z: 100.0,
+    //     },
+    // );
+
+    // let light_mat = glam::DMat4::from_translation(glam::DVec3 {
+    //     x: 0.0,
+    //     y: 50.0,
+    //     z: 0.0,
+    // });
+
+    // let light_mat = glam::DMat4::IDENTITY;
 
     let light_obj = Arc::new(Object::XZRect(XZRect::new(
         (213.0, 343.0),
@@ -184,7 +228,14 @@ fn cornell_box() -> HittableList {
 
     world.add(Arc::new(Object::FlipFace(FlipFace::new(light_obj))));
 
-    world
+    // world.add(light_obj);
+
+    let bvh = Arc::new(Object::BVHNode(BVHNode::new(&mut world, (0.0, 1.0))));
+
+    let mut world2 = HittableList::new();
+    world2.add(bvh);
+
+    world2
 }
 
 fn simple_light() -> HittableList {
