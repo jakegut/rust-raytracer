@@ -1,3 +1,4 @@
+use core::panic;
 use std::{cmp::Ordering, sync::Arc};
 
 use rand::Rng;
@@ -42,8 +43,7 @@ impl BVHNode {
 
         match object_span {
             1 => {
-                left = objects[start].clone();
-                right = objects[start].clone();
+                panic!("BVH resulted in 1 leaf node")
             }
             2 => match cmp(&objects[start], &objects[start + 1]) {
                 Ordering::Less => {
@@ -55,6 +55,15 @@ impl BVHNode {
                     left = objects[start + 1].clone();
                 }
             },
+            3 => {
+                left = Arc::new(Object::BVHNode(BVHNode::from_vec(
+                    objects,
+                    start,
+                    start + 2,
+                    time,
+                )));
+                right = objects[start + 2].clone();
+            }
             _ => {
                 objects[start..end].sort_by(|a, b| cmp(&a, &b));
                 let mid = start + object_span / 2;

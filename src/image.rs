@@ -5,22 +5,18 @@ use eframe::epaint::{Color32, ColorImage};
 use crate::{utils::clamp, vec3::Color};
 
 pub struct Image {
-    data: Vec<u8>,
-    width: usize,
-    height: usize,
     samples: u32,
     frame: Arc<RwLock<ColorImage>>,
 }
 
 impl Image {
-    pub fn new(width: usize, height: usize, samples: u32, frame: Arc<RwLock<ColorImage>>) -> Image {
-        Image {
-            data: Vec::with_capacity(width * height * 3),
-            width,
-            height,
-            samples,
-            frame,
-        }
+    pub fn new(
+        _width: usize,
+        _height: usize,
+        samples: u32,
+        frame: Arc<RwLock<ColorImage>>,
+    ) -> Image {
+        Image { samples, frame }
     }
 
     pub fn append_color(&mut self, color: &Color, x: usize, y: usize) {

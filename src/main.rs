@@ -11,7 +11,7 @@ use rayon::ThreadPoolBuilder;
 use rust_raytracer::hittable::Hittable;
 use rust_raytracer::material::Scatterable;
 use rust_raytracer::object::Object;
-use rust_raytracer::pdf::{CosinePDF, HittablePDF, MixturePDF, NullPDF, PDF};
+use rust_raytracer::pdf::{HittablePDF, MixturePDF, NullPDF, PDF};
 use rust_raytracer::ray::Ray;
 use rust_raytracer::scenes::{new_scene, SceneConfig};
 use rust_raytracer::BIAS;
@@ -20,8 +20,8 @@ use rust_raytracer::camera::Camera;
 
 use rust_raytracer::image::Image;
 
-use rust_raytracer::utils::{random_double, random_double_normal};
-use rust_raytracer::vec3::{Color, Point};
+use rust_raytracer::utils::random_double_normal;
+use rust_raytracer::vec3::Color;
 
 fn ray_color(
     r: &Ray,
@@ -84,7 +84,7 @@ fn ray_color(
 
 fn raytrace(image_width: usize, scene_config: Arc<SceneConfig>, frame: Arc<RwLock<ColorImage>>) {
     let image_height: usize = (image_width as f64 / scene_config.aspect_ratio) as usize;
-    let samples_per_pixel: u32 = 1;
+    let samples_per_pixel: u32 = 50;
     const MAX_DEPTH: u32 = 5;
 
     let world = &scene_config.world;
@@ -149,7 +149,7 @@ fn raytrace(image_width: usize, scene_config: Arc<SceneConfig>, frame: Arc<RwLoc
 
 fn main() -> Result<(), Error> {
     let width: usize = 800;
-    let scene_cfg = new_scene(0);
+    let scene_cfg = new_scene(6);
     let height = (width as f64 / scene_cfg.aspect_ratio) as usize;
     let native_options = eframe::NativeOptions {
         initial_window_size: Some(Vec2::new(width as f32, height as f32)),
@@ -168,9 +168,6 @@ fn main() -> Result<(), Error> {
 struct MyEguiApp {
     texture: Option<egui::TextureHandle>,
     frame_thing: Arc<RwLock<ColorImage>>,
-    current_frame: Option<ColorImage>,
-    image_width: usize,
-    aspect_ratio: f64,
 }
 
 impl MyEguiApp {

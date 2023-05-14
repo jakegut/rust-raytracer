@@ -1,4 +1,3 @@
-use core::panic;
 use std::sync::Arc;
 
 use rand::{thread_rng, Rng};

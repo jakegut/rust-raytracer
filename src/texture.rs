@@ -1,4 +1,4 @@
-use std::{default, fmt::Display, path::Path, sync::Arc};
+use std::{path::Path, sync::Arc};
 
 use crate::{
     utils::clamp,
@@ -115,7 +115,7 @@ impl ImageTexture {
 }
 
 impl TextureMat for ImageTexture {
-    fn value(&self, u: f64, v: f64, p: &Point) -> Color {
+    fn value(&self, u: f64, v: f64, _p: &Point) -> Color {
         let u = clamp(u, 0.0, 1.0);
         let v = 1.0 - clamp(v, 0.0, 1.0);
 

@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use eframe::egui::accesskit::Rect;
-
 use crate::{
     aabb::AABB,
     hittable::{HitRecord, Hittable},
@@ -9,7 +7,6 @@ use crate::{
     material::Material,
     object::Object,
     ray::Ray,
-    texture::Texture,
     utils::random_double,
     vec3::{Point, Vec3},
 };

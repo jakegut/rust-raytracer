@@ -1,12 +1,9 @@
-use glam::DVec3;
-
 use crate::{
     aabb::AABB,
     material::{Lambertain, Material},
-    object::{self, Object},
-    pdf::PDF,
+    object::Object,
     ray::Ray,
-    vec3::{Color, Point, Vec3},
+    vec3::{Point, Vec3},
 };
 use std::sync::Arc;
 #[derive(Clone)]
@@ -46,11 +43,11 @@ impl Default for HitRecord {
 pub trait Hittable {
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord>;
     fn bounding_box(&self, time: (f64, f64)) -> Option<AABB>;
-    fn pdf_value(&self, o: &Point, v: &Point) -> f64 {
+    fn pdf_value(&self, _o: &Point, _v: &Point) -> f64 {
         return 0.0;
     }
 
-    fn random(&self, o: &Vec3) -> Vec3 {
+    fn random(&self, _o: &Vec3) -> Vec3 {
         Vec3::new(1.0, 0.0, 0.0)
     }
 }
@@ -91,33 +88,35 @@ impl Hittable for FlipFace {
 
 pub struct MatTransform {
     pub mat_i: glam::DMat4,
+    pub mat: glam::DMat4,
+    pub aabb: Option<AABB>,
     pub ptr: Arc<Object>,
 }
 
 impl MatTransform {
     pub fn new(mat: glam::DMat4, ptr: Arc<Object>) -> Self {
+        let aabb_ptr = ptr.bounding_box((0.0, 0.0));
+
+        let aabb = match aabb_ptr {
+            None => None,
+            Some(aabb) => Some(AABB {
+                min: mat.transform_point3(aabb.min.into()).into(),
+                max: mat.transform_point3(aabb.max.into()).into(),
+            }),
+        };
+
         Self {
             mat_i: mat.inverse(),
             ptr,
+            mat,
+            aabb,
         }
     }
 }
 
 impl Hittable for MatTransform {
-    fn bounding_box(&self, time: (f64, f64)) -> Option<AABB> {
-        let aabb = self.ptr.bounding_box(time);
-
-        match aabb {
-            None => None,
-            Some(aabb) => {
-                let mat = self.mat_i.inverse();
-
-                Some(AABB {
-                    min: mat.transform_point3(aabb.min.into()).into(),
-                    max: mat.transform_point3(aabb.max.into()).into(),
-                })
-            }
-        }
+    fn bounding_box(&self, _time: (f64, f64)) -> Option<AABB> {
+        self.aabb
     }
 
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
@@ -136,7 +135,7 @@ impl Hittable for MatTransform {
                 let world_space_mat = self.mat_i.transpose();
                 let world_normal =
                     Vec3::from(world_space_mat.transform_vector3(rec.normal.into())).unit();
-                let world_p = Vec3::from(self.mat_i.inverse().transform_point3(rec.p.into()));
+                let world_p = Vec3::from(self.mat.transform_point3(rec.p.into()));
 
                 Some(HitRecord {
                     p: world_p,
@@ -161,8 +160,7 @@ impl Hittable for MatTransform {
     fn random(&self, o: &Vec3) -> Vec3 {
         let object_o = Vec3::from(self.mat_i.transform_vector3((*o).into()));
         Vec3::from(
-            self.mat_i
-                .inverse()
+            self.mat
                 .transform_vector3(self.ptr.random(&object_o).into()),
         )
         // self.ptr.random(o)

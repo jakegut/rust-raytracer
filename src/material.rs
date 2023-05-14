@@ -2,11 +2,10 @@ use std::{f64::consts::PI, sync::Arc};
 
 use crate::{
     hittable::HitRecord,
-    onb::ONB,
     pdf::{CosinePDF, PDF},
     ray::Ray,
     texture::{SolidColor, Texture, TextureMat},
-    utils::{random_cosine_direction, random_double_normal},
+    utils::random_double_normal,
     vec3::{Color, Point, Vec3},
     BIAS,
 };
@@ -62,7 +61,14 @@ pub trait Scatterable {
         None
     }
 
-    fn emitted(&self, ray_in: &Ray, hit_record: &HitRecord, _u: f64, _v: f64, _p: &Point) -> Color {
+    fn emitted(
+        &self,
+        _ray_in: &Ray,
+        _hit_record: &HitRecord,
+        _u: f64,
+        _v: f64,
+        _p: &Point,
+    ) -> Color {
         Color::new_empty()
     }
 }
@@ -87,7 +93,7 @@ impl Lambertain {
 }
 
 impl Scatterable for Lambertain {
-    fn scatter(&self, ray_in: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord> {
+    fn scatter(&self, _ray_in: &Ray, hit_record: &HitRecord) -> Option<ScatterRecord> {
         let scatter_record = ScatterRecord {
             specular_ray: None,
             attenuation: self

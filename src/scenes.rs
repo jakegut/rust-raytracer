@@ -1,15 +1,14 @@
 use std::{f64::consts::PI, sync::Arc};
 
 use crate::{
-    bvh::BVHNode,
     hittable::{FlipFace, MatTransform},
     hittable_list::HittableList,
     material::{Dielectric, DiffuseLight, Lambertain, Material, Metal},
-    mesh::TriangleMesh,
+    mesh::{Mesh, TriangleMesh},
     object::Object,
     rect::{RectBox, XYRect, XZRect, YZRect},
     sphere::{MovingSphere, Sphere},
-    texture::{CheckerTexture, ImageTexture, SolidColor, Texture},
+    texture::{CheckerTexture, ImageTexture, Texture},
     utils::{random_double, random_double_normal},
     vec3::{Color, Point, Vec3},
 };
@@ -90,8 +89,8 @@ pub fn new_scene(choice: u32) -> SceneConfig {
                 aspect_ratio: 1.0,
                 samples_per_pixel: 200,
                 background: Color::new(0.5, 0.6, 0.4),
-                lookat: Vec3::new(15.0, 15.0, 5.0),
-                lookfrom: Vec3::new(25.0, 100.0, 25.0),
+                lookat: Vec3::new(15.0, 15.0, 15.0),
+                lookfrom: Vec3::new(35.0, 15.0, 35.0),
                 vfov: 40.0,
                 ..Default::default()
             },
@@ -121,10 +120,9 @@ fn teapot_galore() -> HittableList {
         0.73, 0.73, 0.73,
     ))));
 
-    let mesh = Arc::new(Object::TriangleMesh(TriangleMesh::new(
-        "data/teapot.obj".into(),
-        white.clone(),
-    )));
+    let mesh = Arc::new(Mesh::new("data/teapot.obj".into()));
+
+    let teapot = Arc::new(Object::TriangleMesh(TriangleMesh::new(mesh, white.clone())));
 
     for j in 0..5 {
         for i in 0..5 {
@@ -144,7 +142,7 @@ fn teapot_galore() -> HittableList {
 
             world.add(Arc::new(Object::MatTransform(MatTransform::new(
                 mesh_mat,
-                mesh.clone(),
+                teapot.clone(),
             ))));
         }
     }
@@ -286,8 +284,11 @@ fn cornell_box() -> HittableList {
             z: 100.0,
         },
     );
-    let mesh = Object::TriangleMesh(TriangleMesh::new("data/teapot.obj".into(), white.clone()));
-    let mesh_scale = Object::MatTransform(MatTransform::new(mesh_mat, Arc::new(mesh)));
+
+    let mesh = Arc::new(Mesh::new("data/teapot.obj".into()));
+
+    let teapot = Object::TriangleMesh(TriangleMesh::new(mesh, white.clone()));
+    let mesh_scale = Object::MatTransform(MatTransform::new(mesh_mat, Arc::new(teapot)));
     world.add(Arc::new(mesh_scale));
 
     world
