@@ -6,6 +6,7 @@ use crate::{
     hittable::{FlipFace, HitRecord, Hittable, MatTransform},
     hittable_list::HittableList,
     material::Material,
+    mesh::TriangleMesh,
     rect::{RectBox, XYRect, XZRect, YZRect},
     sphere::{MovingSphere, Sphere},
     vec3::Vec3,
@@ -20,6 +21,7 @@ pub enum Object {
     YZRect(YZRect),
     XZRect(XZRect),
     RectBox(RectBox),
+    TriangleMesh(TriangleMesh),
 
     FlipFace(FlipFace),
     MatTransform(MatTransform),
@@ -80,6 +82,7 @@ impl Hittable for Object {
             Object::RectBox(rect) => rect.hit(r, t_min, t_max),
             Object::FlipFace(ff) => ff.hit(r, t_min, t_max),
             Object::MatTransform(mt) => mt.hit(r, t_min, t_max),
+            Object::TriangleMesh(tm) => tm.hit(r, t_min, t_max),
         }
     }
 
@@ -95,6 +98,7 @@ impl Hittable for Object {
             Object::RectBox(rect) => rect.bounding_box(time),
             Object::FlipFace(ff) => ff.bounding_box(time),
             Object::MatTransform(mt) => mt.bounding_box(time),
+            Object::TriangleMesh(tm) => tm.bounding_box(time),
         }
     }
 
@@ -110,6 +114,7 @@ impl Hittable for Object {
             Object::RectBox(rect) => rect.pdf_value(o, v),
             Object::FlipFace(ff) => ff.pdf_value(o, v),
             Object::MatTransform(mt) => mt.pdf_value(o, v),
+            Object::TriangleMesh(mt) => mt.pdf_value(o, v),
         }
     }
 
@@ -125,6 +130,7 @@ impl Hittable for Object {
             Object::RectBox(rect) => rect.random(o),
             Object::FlipFace(ff) => ff.random(o),
             Object::MatTransform(mt) => mt.random(o),
+            Object::TriangleMesh(mt) => mt.random(o),
         }
     }
 }

@@ -84,7 +84,7 @@ fn ray_color(
 
 fn raytrace(image_width: usize, scene_config: Arc<SceneConfig>, frame: Arc<RwLock<ColorImage>>) {
     let image_height: usize = (image_width as f64 / scene_config.aspect_ratio) as usize;
-    let samples_per_pixel: u32 = 1000;
+    let samples_per_pixel: u32 = 50;
     const MAX_DEPTH: u32 = 3;
 
     let world = &scene_config.world;
@@ -148,7 +148,7 @@ fn raytrace(image_width: usize, scene_config: Arc<SceneConfig>, frame: Arc<RwLoc
 }
 
 fn main() -> Result<(), Error> {
-    let width: usize = 1000;
+    let width: usize = 800;
     let scene_cfg = new_scene(0);
     let height = (width as f64 / scene_cfg.aspect_ratio) as usize;
     let native_options = eframe::NativeOptions {

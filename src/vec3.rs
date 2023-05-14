@@ -150,6 +150,18 @@ impl Sub for Vec3 {
     }
 }
 
+impl Sub<&Vec3> for Vec3 {
+    type Output = Self;
+
+    fn sub(self, rhs: &Self) -> Self::Output {
+        Vec3 {
+            x: self.x - rhs.x,
+            y: self.y - rhs.y,
+            z: self.z - rhs.z,
+        }
+    }
+}
+
 impl Sub<f64> for Vec3 {
     type Output = Self;
 

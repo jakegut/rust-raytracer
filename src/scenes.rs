@@ -5,6 +5,7 @@ use crate::{
     hittable::{FlipFace, MatTransform},
     hittable_list::HittableList,
     material::{Dielectric, DiffuseLight, Lambertain, Material, Metal},
+    mesh::TriangleMesh,
     object::Object,
     rect::{RectBox, XYRect, XZRect, YZRect},
     sphere::{MovingSphere, Sphere},
@@ -114,7 +115,7 @@ fn cornell_box() -> HittableList {
         0.12, 0.45, 0.15,
     ))));
     let light = Arc::new(Material::DiffuseLight(DiffuseLight::from_color(
-        &Color::new(20.0, 15.0, 10.0),
+        &(Color::new(20.0, 15.0, 10.0) * 5.0),
     )));
 
     world.add(Arc::new(Object::YZRect(YZRect::new(
@@ -214,14 +215,20 @@ fn cornell_box() -> HittableList {
 
     world.add(Arc::new(Object::FlipFace(FlipFace::new(light_obj))));
 
-    // world.add(light_obj);
+    let mesh_mat = glam::DMat4::from_scale_rotation_translation(
+        glam::DVec3::ONE * 25.0,
+        glam::DQuat::from_rotation_y(105_f64.to_radians()),
+        glam::DVec3 {
+            x: 300.0,
+            y: 50.0,
+            z: 100.0,
+        },
+    );
+    let mesh = Object::TriangleMesh(TriangleMesh::new("data/teapot.obj".into(), white.clone()));
+    let mesh_scale = Object::MatTransform(MatTransform::new(mesh_mat, Arc::new(mesh)));
+    world.add(Arc::new(mesh_scale));
 
-    let bvh = Arc::new(Object::BVHNode(BVHNode::new(&mut world, (0.0, 1.0))));
-
-    let mut world2 = HittableList::new();
-    world2.add(bvh);
-
-    world2
+    world
 }
 
 fn simple_light() -> HittableList {

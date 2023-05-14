@@ -134,10 +134,7 @@ impl Hittable for MatTransform {
             None => None,
             Some(rec) => {
                 let world_space_mat = self.mat_i.transpose();
-                let world_normal = Vec3::from(world_space_mat.transform_vector3(rec.normal.into()));
-                // let world_t = (r.orig
-                //     - Vec3::from(self.mat.transform_point3(object_space_ray.at(rec.t).into())))
-                // .length();
+                let world_normal = Vec3::from(world_space_mat.transform_vector3(rec.normal.into())).unit();
                 let world_p = Vec3::from(self.mat_i.inverse().transform_point3(rec.p.into()));
 
                 Some(HitRecord {

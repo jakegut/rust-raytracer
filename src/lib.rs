@@ -5,6 +5,8 @@ pub mod hittable;
 pub mod hittable_list;
 pub mod image;
 pub mod material;
+pub mod mesh;
+pub mod obj;
 pub mod object;
 pub mod onb;
 pub mod pdf;
