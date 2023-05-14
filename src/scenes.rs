@@ -73,7 +73,7 @@ pub fn new_scene(choice: u32) -> SceneConfig {
             },
             simple_light(),
         ),
-        6 | _ => (
+        6 => (
             SceneConfig {
                 aspect_ratio: 1.0,
                 samples_per_pixel: 200,
@@ -84,6 +84,18 @@ pub fn new_scene(choice: u32) -> SceneConfig {
                 ..Default::default()
             },
             cornell_box(),
+        ),
+        7 | _ => (
+            SceneConfig {
+                aspect_ratio: 1.0,
+                samples_per_pixel: 200,
+                background: Color::new(0.5, 0.6, 0.4),
+                lookat: Vec3::new(15.0, 15.0, 5.0),
+                lookfrom: Vec3::new(25.0, 100.0, 25.0),
+                vfov: 40.0,
+                ..Default::default()
+            },
+            teapot_galore(),
         ),
     };
 
@@ -100,6 +112,56 @@ pub fn new_scene(choice: u32) -> SceneConfig {
         cfg.aspect_ratio
     };
     return cfg;
+}
+
+fn teapot_galore() -> HittableList {
+    let mut world = HittableList::new();
+
+    let white = Arc::new(Material::Lambertain(Lambertain::new(Color::new(
+        0.73, 0.73, 0.73,
+    ))));
+
+    let mesh = Arc::new(Object::TriangleMesh(TriangleMesh::new(
+        "data/teapot.obj".into(),
+        white.clone(),
+    )));
+
+    for j in 0..5 {
+        for i in 0..5 {
+            let center = glam::DVec3 {
+                x: (i as f64) * 6.0,
+                y: (j as f64) * 6.0,
+                z: 5.0,
+            };
+
+            let rot = glam::DQuat::from_axis_angle(
+                Vec3::random_unit_vector().into(),
+                random_double(0.0, 2.0 * PI),
+            );
+
+            let mesh_mat =
+                glam::DMat4::from_scale_rotation_translation(glam::DVec3::ONE * 1.0, rot, center);
+
+            world.add(Arc::new(Object::MatTransform(MatTransform::new(
+                mesh_mat,
+                mesh.clone(),
+            ))));
+        }
+    }
+
+    let checker = Arc::new(Texture::CheckerTexture(CheckerTexture::from_colors(
+        Color::new(0.2, 0.3, 0.1),
+        Color::new(0.9, 0.9, 0.9),
+    )));
+    let ground_mat = Arc::new(Material::Lambertain(Lambertain::from_texture(checker)));
+    world.add(Arc::new(Object::XYRect(XYRect::new(
+        (-50.0, 50.0),
+        (-50.0, 50.0),
+        0.0,
+        ground_mat,
+    ))));
+
+    world
 }
 
 fn cornell_box() -> HittableList {

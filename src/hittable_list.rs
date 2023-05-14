@@ -8,6 +8,7 @@ use crate::{
     hittable::{HitRecord, Hittable},
     object::Object,
     utils::get_all_lights,
+    vec3::{Point, Vec3},
 };
 
 #[derive(Clone)]
@@ -89,7 +90,7 @@ impl Hittable for HittableList {
         Some(output_box)
     }
 
-    fn pdf_value(&self, o: &crate::vec3::Point, v: &crate::vec3::Point) -> f64 {
+    fn pdf_value(&self, o: &Point, v: &Point) -> f64 {
         let wt = 1.0 / self.objects.len() as f64;
         let mut sum = 0.0;
 
@@ -99,9 +100,9 @@ impl Hittable for HittableList {
         sum
     }
 
-    fn random(&self, o: &crate::vec3::Vec3) -> crate::vec3::Vec3 {
+    fn random(&self, o: &Vec3) -> Vec3 {
         if self.objects.len() == 0 {
-            panic!("empty hittable list!")
+            return Vec3::random_unit_vector();
         }
         let mut rng = thread_rng();
         let size = self.objects.len();

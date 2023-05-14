@@ -84,8 +84,8 @@ fn ray_color(
 
 fn raytrace(image_width: usize, scene_config: Arc<SceneConfig>, frame: Arc<RwLock<ColorImage>>) {
     let image_height: usize = (image_width as f64 / scene_config.aspect_ratio) as usize;
-    let samples_per_pixel: u32 = 50;
-    const MAX_DEPTH: u32 = 3;
+    let samples_per_pixel: u32 = 1;
+    const MAX_DEPTH: u32 = 5;
 
     let world = &scene_config.world;
     let arc_world = Arc::new(world);
