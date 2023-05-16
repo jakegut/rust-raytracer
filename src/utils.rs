@@ -1,8 +1,12 @@
-use std::{f64::consts::PI, sync::Arc};
+use std::{f64::consts::PI, sync::Arc, vec};
 
 use rand::Rng;
 
-use crate::{object::Object, vec3::Vec3};
+use crate::{
+    bvh::{BVHNode, BVHNodeType},
+    object::Object,
+    vec3::Vec3,
+};
 
 pub fn random_double_normal() -> f64 {
     let mut rng = rand::thread_rng();
@@ -43,6 +47,17 @@ pub fn get_all_lights(v: &Vec<Arc<Object>>) -> Vec<Arc<Object>> {
             } else {
                 o.get_lights()
             }
+        })
+        .clone()
+        .collect()
+}
+
+pub fn get_lights_from_node(left: Arc<BVHNode>, right: Arc<BVHNode>) -> Vec<Arc<Object>> {
+    vec![left, right]
+        .iter()
+        .flat_map(|o| match &o.info {
+            BVHNodeType::Interior(left, right) => get_lights_from_node(left.clone(), right.clone()),
+            BVHNodeType::Leaf(hl) => hl.get_lights(),
         })
         .clone()
         .collect()

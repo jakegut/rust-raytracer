@@ -28,6 +28,10 @@ impl HittableList {
         }
     }
 
+    pub fn from_vec(v: Vec<Arc<Object>>) -> Self {
+        HittableList { objects: v }
+    }
+
     pub fn clear(&mut self) {
         self.objects.clear()
     }

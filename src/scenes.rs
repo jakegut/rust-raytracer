@@ -84,17 +84,29 @@ pub fn new_scene(choice: u32) -> SceneConfig {
             },
             cornell_box(),
         ),
-        7 | _ => (
+        7 => (
             SceneConfig {
                 aspect_ratio: 1.0,
                 samples_per_pixel: 200,
                 background: Color::new(0.5, 0.6, 0.4),
-                lookat: Vec3::new(15.0, 15.0, 15.0),
+                lookat: Vec3::new(0.0, 15.0, 0.0),
                 lookfrom: Vec3::new(35.0, 15.0, 35.0),
                 vfov: 40.0,
                 ..Default::default()
             },
             teapot_galore(),
+        ),
+        8 | _ => (
+            SceneConfig {
+                aspect_ratio: 1.0,
+                samples_per_pixel: 200,
+                background: Color::new_empty(),
+                lookfrom: Vec3::new(278.0, 278.0, -800.0),
+                lookat: Vec3::new(278.0, 278.0, 0.0),
+                vfov: 40.0,
+                ..Default::default()
+            },
+            dragon_cornell(),
         ),
     };
 
@@ -124,45 +136,73 @@ fn teapot_galore() -> HittableList {
 
     let teapot = Arc::new(Object::TriangleMesh(TriangleMesh::new(mesh, white.clone())));
 
-    for j in 0..5 {
-        for i in 0..5 {
-            let center = glam::DVec3 {
-                x: (i as f64) * 6.0,
-                y: (j as f64) * 6.0,
-                z: 5.0,
-            };
+    let rot = glam::DQuat::from_axis_angle(
+        Vec3::random_unit_vector().into(),
+        random_double(0.0, 2.0 * PI),
+    );
 
-            let rot = glam::DQuat::from_axis_angle(
-                Vec3::random_unit_vector().into(),
-                random_double(0.0, 2.0 * PI),
-            );
+    let mesh_mat = glam::DMat4::from_scale_rotation_translation(
+        glam::DVec3::ONE * 1.0,
+        rot,
+        glam::DVec3::new(0.0, 15.0, 0.0),
+    );
 
-            let mesh_mat =
-                glam::DMat4::from_scale_rotation_translation(glam::DVec3::ONE * 1.0, rot, center);
-
-            world.add(Arc::new(Object::MatTransform(MatTransform::new(
-                mesh_mat,
-                teapot.clone(),
-            ))));
-        }
-    }
+    world.add(Arc::new(Object::MatTransform(MatTransform::new(
+        mesh_mat,
+        teapot.clone(),
+    ))));
 
     let checker = Arc::new(Texture::CheckerTexture(CheckerTexture::from_colors(
         Color::new(0.2, 0.3, 0.1),
         Color::new(0.9, 0.9, 0.9),
     )));
     let ground_mat = Arc::new(Material::Lambertain(Lambertain::from_texture(checker)));
-    world.add(Arc::new(Object::XYRect(XYRect::new(
-        (-50.0, 50.0),
-        (-50.0, 50.0),
-        0.0,
+    world.add(Arc::new(Object::Sphere(Sphere::new(
+        Point::new(0.0, -1000.0, 0.0),
+        1000.0,
         ground_mat,
     ))));
+
+    let diff_light = Arc::new(Material::DiffuseLight(DiffuseLight::from_color(
+        &Color::new(1.0, 1.0, 1.0),
+    )));
+    world.add(Arc::new(Object::Sphere(Sphere::new(
+        Point::new(0.0, 50.0, 0.0),
+        1.0,
+        diff_light,
+    ))));
+    world
+}
+
+fn dragon_cornell() -> HittableList {
+    let mut world = empty_cornell();
+
+    let white = Arc::new(Material::Lambertain(Lambertain::new(Color::new(
+        0.73, 0.73, 0.73,
+    ))));
+
+    let mesh_mat = glam::DMat4::from_scale_rotation_translation(
+        glam::DVec3::ONE * 25.0,
+        glam::DQuat::from_rotation_y(105_f64.to_radians()),
+        glam::DVec3 {
+            x: 300.0,
+            y: 50.0,
+            z: 100.0,
+        },
+    );
+
+    // let mesh_mat = glam::DMat4::IDENTITY;
+
+    let mesh = Arc::new(Mesh::new("data/dragon.obj".into()));
+
+    let teapot = Object::TriangleMesh(TriangleMesh::new(mesh, white.clone()));
+    let mesh_scale = Object::MatTransform(MatTransform::new(mesh_mat, Arc::new(teapot)));
+    world.add(Arc::new(mesh_scale));
 
     world
 }
 
-fn cornell_box() -> HittableList {
+fn empty_cornell() -> HittableList {
     let mut world = HittableList::new();
 
     let red = Arc::new(Material::Lambertain(Lambertain::new(Color::new(
@@ -207,6 +247,25 @@ fn cornell_box() -> HittableList {
         (0.0, 555.0),
         555.0,
         white.clone(),
+    ))));
+
+    let light_obj = Arc::new(Object::XZRect(XZRect::new(
+        (213.0, 343.0),
+        (277.0, 332.0),
+        554.0,
+        light,
+    )));
+
+    world.add(Arc::new(Object::FlipFace(FlipFace::new(light_obj))));
+
+    world
+}
+
+fn cornell_box() -> HittableList {
+    let mut world = empty_cornell();
+
+    let white = Arc::new(Material::Lambertain(Lambertain::new(Color::new(
+        0.73, 0.73, 0.73,
     ))));
 
     let box0 = Arc::new(Object::RectBox(RectBox::new(
@@ -263,17 +322,6 @@ fn cornell_box() -> HittableList {
     //     y: 50.0,
     //     z: 0.0,
     // });
-
-    // let light_mat = glam::DMat4::IDENTITY;
-
-    let light_obj = Arc::new(Object::XZRect(XZRect::new(
-        (213.0, 343.0),
-        (277.0, 332.0),
-        554.0,
-        light,
-    )));
-
-    world.add(Arc::new(Object::FlipFace(FlipFace::new(light_obj))));
 
     let mesh_mat = glam::DMat4::from_scale_rotation_translation(
         glam::DVec3::ONE * 25.0,

@@ -11,7 +11,7 @@ use rayon::ThreadPoolBuilder;
 use rust_raytracer::hittable::Hittable;
 use rust_raytracer::material::Scatterable;
 use rust_raytracer::object::Object;
-use rust_raytracer::pdf::{HittablePDF, MixturePDF, NullPDF, PDF};
+use rust_raytracer::pdf::{HittablePDF, MixturePDF, PDF};
 use rust_raytracer::ray::Ray;
 use rust_raytracer::scenes::{new_scene, SceneConfig};
 use rust_raytracer::BIAS;
@@ -57,7 +57,7 @@ fn ray_color(
 
                     let pdf: MixturePDF = match srec.pdf_ptr {
                         Some(pdf_ptr) => MixturePDF::new(light_pdf, pdf_ptr.clone()),
-                        None => MixturePDF::new(light_pdf.clone(), Arc::new(NullPDF {})),
+                        None => MixturePDF::new(light_pdf.clone(), light_pdf.clone()),
                     };
 
                     let scattered =
@@ -149,7 +149,7 @@ fn raytrace(image_width: usize, scene_config: Arc<SceneConfig>, frame: Arc<RwLoc
 
 fn main() -> Result<(), Error> {
     let width: usize = 800;
-    let scene_cfg = new_scene(6);
+    let scene_cfg = new_scene(8);
     let height = (width as f64 / scene_cfg.aspect_ratio) as usize;
     let native_options = eframe::NativeOptions {
         initial_window_size: Some(Vec2::new(width as f32, height as f32)),

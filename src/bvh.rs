@@ -7,94 +7,70 @@ use crate::{
     aabb::AABB,
     hittable::{HitRecord, Hittable},
     hittable_list::HittableList,
+    obj,
     object::Object,
     ray::Ray,
-    utils::get_all_lights,
+    utils::{get_all_lights, get_lights_from_node},
 };
 
+pub enum BVHNodeType {
+    Leaf(Arc<HittableList>),
+    Interior(Arc<BVHNode>, Arc<BVHNode>),
+}
+
 pub struct BVHNode {
-    left: Arc<Object>,
-    right: Arc<Object>,
+    pub info: BVHNodeType,
     bx: AABB,
 }
 
 impl BVHNode {
-    pub fn new(hittable_list: &mut HittableList, time: (f64, f64)) -> Self {
-        let len = hittable_list.objects.len();
-        BVHNode::from_vec(&mut hittable_list.objects, 0, len, time)
+    pub fn new(hittable_list: HittableList, time: (f64, f64)) -> Self {
+        BVHNode::from_vec(hittable_list.objects, time)
     }
 
-    pub fn from_vec(
-        src_objects: &mut [Arc<Object>],
-        start: usize,
-        end: usize,
-        time: (f64, f64),
-    ) -> Self {
-        let left: Arc<Object>;
-        let right: Arc<Object>;
+    pub fn from_vec(mut src_objects: Vec<Arc<Object>>, time: (f64, f64)) -> Self {
+        let info: BVHNodeType;
+        let bx: AABB;
 
-        let mut rng = rand::thread_rng();
-        let objects = src_objects;
-        let axis: usize = rng.gen_range(0..=2);
-        // let axis = 2;
+        let mut axis_ranges: Vec<(usize, f64)> =
+            (0..3).map(|a| (a, axis_range(&src_objects, a))).collect();
+
+        axis_ranges.sort_unstable_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+        let axis = axis_ranges[0].0;
         let cmp = cmp_box(axis);
 
-        let object_span = end - start;
+        let object_span = src_objects.len();
+
+        src_objects.sort_unstable_by(|a, b| cmp(&a, &b));
 
         match object_span {
-            1 => {
-                panic!("BVH resulted in 1 leaf node")
-            }
-            2 => match cmp(&objects[start], &objects[start + 1]) {
-                Ordering::Less => {
-                    left = objects[start].clone();
-                    right = objects[start + 1].clone();
-                }
-                _ => {
-                    right = objects[start].clone();
-                    left = objects[start + 1].clone();
-                }
-            },
-            3 => {
-                left = Arc::new(Object::BVHNode(BVHNode::from_vec(
-                    objects,
-                    start,
-                    start + 2,
-                    time,
-                )));
-                right = objects[start + 2].clone();
+            1..=20 => {
+                let list = Arc::new(HittableList::from_vec(src_objects));
+                info = BVHNodeType::Leaf(list.clone());
+                bx = list.bounding_box(time).expect("leaf bounding box");
             }
             _ => {
-                objects[start..end].sort_by(|a, b| cmp(&a, &b));
-                let mid = start + object_span / 2;
-                left = Arc::new(Object::BVHNode(BVHNode::from_vec(
-                    objects, start, mid, time,
-                )));
-                right = Arc::new(Object::BVHNode(BVHNode::from_vec(objects, mid, end, time)));
+                let mid = object_span / 2;
+                let left = Arc::new(BVHNode::from_vec(src_objects.drain(mid..).collect(), time));
+                let right = Arc::new(BVHNode::from_vec(src_objects, time));
+
+                let box_left = left.bounding_box(time).expect("left bounding box");
+                let box_right = right.bounding_box(time).expect("right bounding box");
+
+                bx = AABB::from_surrounding(box_left, box_right);
+                info = BVHNodeType::Interior(left, right);
             }
         };
 
-        let box_left = left.bounding_box(time);
-        let box_right = right.bounding_box(time);
-
-        if box_left.is_none() && box_right.is_none() {
-            panic!()
-        }
-
-        let bxs = Some((box_left, box_right));
-
-        match bxs {
-            Some((Some(bx_left), Some(bx_right))) => Self {
-                left,
-                right,
-                bx: AABB::from_surrounding(bx_left, bx_right),
-            },
-            _ => unreachable!(),
-        }
+        Self { info, bx }
     }
 
     pub fn get_lights(&self) -> Vec<Arc<Object>> {
-        get_all_lights(&vec![self.left.clone(), self.right.clone()])
+        match &self.info {
+            BVHNodeType::Interior(left, right) => get_lights_from_node(left.clone(), right.clone()),
+            BVHNodeType::Leaf(hl) => hl.get_lights(),
+        }
     }
 }
 
@@ -108,29 +84,44 @@ impl Hittable for BVHNode {
             return None;
         };
 
-        let hit_left = self.left.hit(r, t_min, t_max);
+        match &self.info {
+            BVHNodeType::Leaf(hl) => hl.hit(r, t_min, t_max),
+            BVHNodeType::Interior(left, right) => {
+                let hit_left = left.hit(r, t_min, t_max);
 
-        let lhc = hit_left.clone();
-        let t = if let Some(hc) = hit_left { hc.t } else { t_max };
+                let t = if let Some(hc) = &hit_left {
+                    hc.t
+                } else {
+                    t_max
+                };
 
-        let hit_right = self.right.hit(r, t_min, t);
+                let hit_right = right.hit(r, t_min, t);
 
-        hit_right.or(lhc)
+                hit_right.or(hit_left)
+            }
+        }
     }
 }
 
 fn cmp_box(axis: usize) -> impl Fn(&Object, &Object) -> Ordering {
     move |a, b| {
-        let box_a = a.bounding_box((0.0, 0.0));
-        let box_b = b.bounding_box((0.0, 0.0));
-        if let Some(box_a) = box_a {
-            if let Some(box_b) = box_b {
-                return box_a.min[axis].partial_cmp(&box_b.min[axis]).unwrap();
-            } else {
-                unreachable!()
-            }
-        } else {
-            unreachable!()
-        }
+        let box_a = a.bounding_box((0.0, 0.0)).expect("some bounding box");
+        let box_b = b.bounding_box((0.0, 0.0)).expect("some bounding box");
+        let ac = box_a.min[axis] + box_a.max[axis];
+        let bc = box_b.min[axis] + box_b.max[axis];
+        return ac.partial_cmp(&bc).unwrap();
     }
+}
+
+fn axis_range(objects: &Vec<Arc<Object>>, axis: usize) -> f64 {
+    let (min, max) = objects
+        .iter()
+        .fold((f64::MAX, f64::MIN), |(bmin, bmax), hit| {
+            if let Some(aabb) = hit.bounding_box((0.0, 0.0)) {
+                (bmin.min(aabb.min[axis]), bmax.max(aabb.max[axis]))
+            } else {
+                (bmin, bmax)
+            }
+        });
+    max - min
 }

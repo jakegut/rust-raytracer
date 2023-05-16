@@ -1,4 +1,7 @@
+use core::panic;
 use std::sync::Arc;
+
+use glam::{DVec2, Vec2};
 
 use crate::{
     aabb::AABB,
@@ -14,6 +17,8 @@ use crate::{
 
 pub struct Triangle {
     pub vs: (Vec3, Vec3, Vec3),
+    pub normals: Option<(Vec3, Vec3, Vec3)>,
+    pub uvs: Option<(DVec2, DVec2, DVec2)>,
 }
 
 impl Hittable for Triangle {
@@ -33,9 +38,21 @@ impl Hittable for Triangle {
 
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
         match triangle_intersect(r, self.vs) {
-            Some((t, uv, normal)) => {
+            Some((t, mut uv, mut normal)) => {
                 if t < t_max && t > t_min {
                     let mut new_rec = HitRecord::default();
+
+                    if let Some(normals) = self.normals {
+                        normal =
+                            (1.0 - uv.0 - uv.1) * normals.0 + uv.0 * normals.1 + uv.1 * normals.2
+                    }
+
+                    if let Some(uvs) = self.uvs {
+                        let v = (1.0 - uv.0 - uv.1) * uvs.0 + uv.0 * uvs.1 + uv.1 * uvs.2;
+                        uv.0 = v.x;
+                        uv.1 = v.y;
+                    }
+
                     new_rec.p = r.at(t);
                     new_rec.set_face_normal(r, normal);
                     new_rec.t = t;
@@ -53,7 +70,7 @@ impl Hittable for Triangle {
 pub struct Mesh {
     // pub verts: HittableList,
     pub node: BVHNode,
-    pub bx: AABB,
+    pub bx: Option<AABB>,
 }
 
 impl Mesh {
@@ -62,32 +79,41 @@ impl Mesh {
 
         let mut tris = HittableList::new();
 
-        for face in &obj.face_array {
-            let v0 = obj.ver_array[face.0 as usize - 1];
-            let v1 = obj.ver_array[face.1 as usize - 1];
-            let v2 = obj.ver_array[face.2 as usize - 1];
+        for face in &obj.faces {
+            if face.verts.len() != 3 {
+                panic!("face info doesn't have 3 verts")
+            }
 
-            tris.add(Arc::new(Object::Triangle(Triangle { vs: (v0, v1, v2) })))
+            let v0 = obj.vers[face.verts[0].vert_idx - 1];
+            let v1 = obj.vers[face.verts[1].vert_idx - 1];
+            let v2 = obj.vers[face.verts[2].vert_idx - 1];
+
+            let mut uvs = None;
+            if face.verts[0].uv_idx != 0 {
+                let uv0 = obj.uvs[face.verts[0].uv_idx - 1];
+                let uv1 = obj.uvs[face.verts[1].uv_idx - 1];
+                let uv2 = obj.uvs[face.verts[2].uv_idx - 1];
+                uvs = Some((uv0, uv1, uv2))
+            }
+
+            let mut normals = None;
+            if face.verts[0].normal_idx != 0 {
+                let n0 = obj.normals[face.verts[0].normal_idx - 1];
+                let n1 = obj.normals[face.verts[1].normal_idx - 1];
+                let n2 = obj.normals[face.verts[2].normal_idx - 1];
+                normals = Some((n0, n1, n2))
+            }
+
+            tris.add(Arc::new(Object::Triangle(Triangle {
+                vs: (v0, v1, v2),
+                normals,
+                uvs,
+            })))
         }
 
-        let node = BVHNode::new(&mut tris, (0.0, 0.0));
+        let node = BVHNode::new(tris, (0.0, 0.0));
 
-        let mut vmin = obj.ver_array[0];
-        let mut vmax = obj.ver_array[0];
-        for v in obj.ver_array[1..].to_vec() {
-            vmin = Vec3 {
-                x: vmin.x.min(v.x),
-                y: vmin.y.min(v.y),
-                z: vmin.z.min(v.z),
-            };
-            vmax = Vec3 {
-                x: vmax.x.max(v.x),
-                y: vmax.y.max(v.y),
-                z: vmax.z.max(v.z),
-            };
-        }
-
-        let bx = AABB::new(vmin, vmax);
+        let bx = node.bounding_box((0.0, 0.0));
 
         Self { node, bx }
     }
@@ -106,13 +132,10 @@ impl TriangleMesh {
 
 impl Hittable for TriangleMesh {
     fn bounding_box(&self, _time: (f64, f64)) -> Option<crate::aabb::AABB> {
-        Some(self.mesh.bx)
+        self.mesh.bx
     }
 
     fn hit(&self, r: &Ray, t_min: f64, t_max: f64) -> Option<HitRecord> {
-        if !self.mesh.bx.hit(r, t_min, t_max) {
-            return None;
-        }
         match self.mesh.node.hit(r, t_min, t_max) {
             Some(rec) => {
                 let mut new_rec = rec;
@@ -151,10 +174,6 @@ pub fn triangle_intersect(r: &Ray, v: (Point, Point, Point)) -> Option<(f64, (f6
     let t = v0v2.dot(q_vec) * inv_det;
 
     let normal = v0v1.cross(v0v2).unit();
-
-    // if det < 0.0 {
-    //     normal = -normal;
-    // }
 
     Some((t, (u, v), normal))
 }
