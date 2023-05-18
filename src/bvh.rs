@@ -10,7 +10,8 @@ use crate::{
     obj,
     object::Object,
     ray::Ray,
-    utils::{get_all_lights, get_lights_from_node},
+    utils::{get_all_lights, get_lights_from_node, random_double_normal},
+    vec3::{Point, Vec3},
 };
 
 pub enum BVHNodeType {
@@ -99,6 +100,32 @@ impl Hittable for BVHNode {
 
                 hit_right.or(hit_left)
             }
+        }
+    }
+
+    fn pdf_value(&self, o: &Point, v: &Point) -> f64 {
+        if !self.bx.hit(&Ray::new(*o, *v), 0.0001, f64::MAX) {
+            return 0.0;
+        }
+
+        match &self.info {
+            BVHNodeType::Interior(left, right) => {
+                0.5 * left.pdf_value(o, v) + 0.5 * right.pdf_value(o, v)
+            }
+            BVHNodeType::Leaf(hl) => hl.pdf_value(o, v),
+        }
+    }
+
+    fn random(&self, o: &Vec3) -> Vec3 {
+        match &self.info {
+            BVHNodeType::Interior(left, right) => {
+                if random_double_normal() < 0.5 {
+                    left.random(o)
+                } else {
+                    right.random(o)
+                }
+            }
+            BVHNodeType::Leaf(hl) => hl.random(o),
         }
     }
 }

@@ -12,6 +12,7 @@ use crate::{
     obj::load_obj,
     object::Object,
     ray::Ray,
+    utils::random_double_normal,
     vec3::{Point, Vec3},
 };
 
@@ -64,6 +65,39 @@ impl Hittable for Triangle {
             }
             _ => None,
         }
+    }
+
+    fn pdf_value(&self, o: &Point, v: &Point) -> f64 {
+        match self.hit(&Ray::new(*o, *v), 0.001, f64::MAX) {
+            None => 0.0,
+            Some(rec) => {
+                let area = 0.5
+                    * (self.vs.1 - self.vs.0)
+                        .cross(self.vs.2 - self.vs.0)
+                        .length();
+                let dist_sqrd = rec.t * rec.t * v.length_squared();
+                let cos = (v.dot(rec.normal)).abs() / v.length();
+
+                dist_sqrd / (cos * area)
+            }
+        }
+    }
+
+    fn random(&self, o: &Vec3) -> Vec3 {
+        let r1 = random_double_normal();
+        let r2 = random_double_normal();
+
+        let sqrt_r = r1.sqrt();
+        let a = 1.0 - sqrt_r;
+        let b = sqrt_r * (1.0 - r2);
+        let c = sqrt_r * r2;
+
+        let x = a * self.vs.0.x + b * self.vs.1.x + c * self.vs.2.x;
+        let y = a * self.vs.0.y + b * self.vs.1.y + c * self.vs.2.y;
+        let z = a * self.vs.0.z + b * self.vs.1.z + c * self.vs.2.z;
+
+        let v = Vec3::new(x, y, z);
+        v - o
     }
 }
 
@@ -144,6 +178,14 @@ impl Hittable for TriangleMesh {
             }
             _ => None,
         }
+    }
+
+    fn pdf_value(&self, o: &Point, v: &Point) -> f64 {
+        self.mesh.node.pdf_value(o, v)
+    }
+
+    fn random(&self, o: &Vec3) -> Vec3 {
+        self.mesh.node.random(o)
     }
 }
 

@@ -74,6 +74,7 @@ fn ray_color(
                             * scat_pdf
                             * ray_color(&scattered, world, lights.clone(), background, depth - 1)
                             / pdf_val
+                    // srec.attenuation + light_color + ray_color(&scattered, world, lights.clone(), background, depth - 1)
                 }
                 None => emitted,
             }
@@ -84,7 +85,7 @@ fn ray_color(
 
 fn raytrace(image_width: usize, scene_config: Arc<SceneConfig>, frame: Arc<RwLock<ColorImage>>) {
     let image_height: usize = (image_width as f64 / scene_config.aspect_ratio) as usize;
-    let samples_per_pixel: u32 = 50;
+    let samples_per_pixel: u32 = 100;
     const MAX_DEPTH: u32 = 5;
 
     let world = &scene_config.world;
@@ -110,35 +111,78 @@ fn raytrace(image_width: usize, scene_config: Arc<SceneConfig>, frame: Arc<RwLoc
 
     let pool = ThreadPoolBuilder::new().num_threads(12).build().unwrap();
 
+    let mut chunks: Vec<(usize, usize)> = vec![];
+    let chunk_size = 16;
+    let chunk_width = image_height / chunk_size;
+    let chunk_height = image_height / chunk_size;
+
+    for j in 0..chunk_height {
+        for i in 0..chunk_width {
+            chunks.push((i, j))
+        }
+    }
+
     let start = Instant::now();
     let background = scene_config.background;
     pool.scope(|s| {
-        for j in 0..image_height {
+        for chunk in chunks {
             let arc_world = arc_world.clone();
             let camera = camera.clone();
             let image = arc_image.clone();
             let arc_lights = lights.clone();
             s.spawn(move |_| {
-                let mut colors = vec![Color::new(samples_per_pixel as f64, 0.0, 0.0); image_width];
+                let mut colors =
+                    vec![Color::new(samples_per_pixel as f64, 0.0, 0.0); chunk_size * chunk_size];
                 let mut img = image.lock().unwrap();
                 for (i, color) in colors.iter().enumerate() {
-                    img.append_color(color, i, image_height - j - 1);
+                    let pos_y = chunk_size * chunk.0 + (i % chunk_size);
+                    let pos_x = chunk_size * chunk.1 + (i / chunk_size);
+
+                    if pos_y > image_height || pos_x > image_width {
+                        continue;
+                    }
+
+                    img.append_color(color, pos_x, image_height - pos_y - 1);
                 }
                 drop(img);
-                for i in 0..image_width {
-                    let mut pixel_color = Color::default();
-                    for _s in 0..samples_per_pixel {
-                        let u = ((i as f64) + random_double_normal()) / (image_width - 1) as f64;
-                        let v = ((j as f64) + random_double_normal()) / (image_height - 1) as f64;
-                        let r = camera.get_ray(u, v);
-                        pixel_color +=
-                            ray_color(&r, &arc_world, arc_lights.clone(), &background, MAX_DEPTH);
+                for j in 0..chunk_size {
+                    let y = chunk_size * chunk.1 + j;
+                    if y > image_height {
+                        continue;
                     }
-                    colors[i] = pixel_color;
+                    for i in 0..chunk_size {
+                        let x = chunk_size * chunk.0 + i;
+                        if x > image_width {
+                            continue;
+                        }
+                        let mut pixel_color = Color::default();
+                        for _s in 0..samples_per_pixel {
+                            let u =
+                                ((y as f64) + random_double_normal()) / (image_width - 1) as f64;
+                            let v =
+                                ((x as f64) + random_double_normal()) / (image_height - 1) as f64;
+                            let r = camera.get_ray(u, v);
+                            pixel_color += ray_color(
+                                &r,
+                                &arc_world,
+                                arc_lights.clone(),
+                                &background,
+                                MAX_DEPTH,
+                            );
+                        }
+                        colors[j * chunk_size + i] = pixel_color;
+                    }
                 }
                 let mut img = image.lock().unwrap();
                 for (i, color) in colors.iter().enumerate() {
-                    img.append_color(color, i, image_height - j - 1);
+                    let pos_y = chunk_size * chunk.0 + (i % chunk_size);
+                    let pos_x = chunk_size * chunk.1 + (i / chunk_size);
+
+                    if pos_y > image_height || pos_x > image_width {
+                        continue;
+                    }
+
+                    img.append_color(color, pos_x, image_height - pos_y - 1);
                 }
             })
         }
@@ -148,8 +192,8 @@ fn raytrace(image_width: usize, scene_config: Arc<SceneConfig>, frame: Arc<RwLoc
 }
 
 fn main() -> Result<(), Error> {
-    let width: usize = 800;
-    let scene_cfg = new_scene(8);
+    let width: usize = 700;
+    let scene_cfg = new_scene(7);
     let height = (width as f64 / scene_cfg.aspect_ratio) as usize;
     let native_options = eframe::NativeOptions {
         initial_window_size: Some(Vec2::new(width as f32, height as f32)),

@@ -53,6 +53,7 @@ impl Object {
                     Object::XZRect(r) => Some(r.mat.clone()),
                     Object::XYRect(r) => Some(r.mat.clone()),
                     Object::Sphere(r) => Some(r.mat.clone()),
+                    Object::TriangleMesh(tm) => Some(tm.mat.clone()),
                     _ => None,
                 };
 
@@ -60,6 +61,7 @@ impl Object {
                     Some(m) => match *m {
                         Material::DiffuseLight(_) => true,
                         Material::Dielectric(_) => true,
+                        Material::Metal(_) => true,
                         _ => false,
                     },
                     None => false,

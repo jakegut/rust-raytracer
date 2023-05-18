@@ -151,14 +151,17 @@ impl Hittable for MatTransform {
 
     fn pdf_value(&self, o: &Point, v: &Point) -> f64 {
         let object_o = Vec3::from(self.mat_i.transform_point3((*o).into()));
-        let object_v = Vec3::from(self.mat_i.transform_point3((*v).into()));
+        let object_v = Vec3::from(self.mat_i.transform_vector3((*v).into()));
 
-        self.ptr.pdf_value(&object_o, &object_v)
+        let (s, _, _) = self.mat.to_scale_rotation_translation();
+        let m = s.max_element();
+
+        self.ptr.pdf_value(&object_o, &object_v) * m
         // self.ptr.pdf_value(o, v)
     }
 
     fn random(&self, o: &Vec3) -> Vec3 {
-        let object_o = Vec3::from(self.mat_i.transform_vector3((*o).into()));
+        let object_o = Vec3::from(self.mat_i.transform_point3((*o).into()));
         Vec3::from(
             self.mat
                 .transform_vector3(self.ptr.random(&object_o).into()),

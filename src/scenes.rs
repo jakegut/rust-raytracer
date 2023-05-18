@@ -89,8 +89,8 @@ pub fn new_scene(choice: u32) -> SceneConfig {
                 aspect_ratio: 1.0,
                 samples_per_pixel: 200,
                 background: Color::new(0.5, 0.6, 0.4),
-                lookat: Vec3::new(0.0, 15.0, 0.0),
-                lookfrom: Vec3::new(35.0, 15.0, 35.0),
+                lookat: Vec3::new(15.0, 0.0, 10.0),
+                lookfrom: Vec3::new(15.00001, 60.0, 10.001),
                 vfov: 40.0,
                 ..Default::default()
             },
@@ -134,23 +134,29 @@ fn teapot_galore() -> HittableList {
 
     let mesh = Arc::new(Mesh::new("data/teapot.obj".into()));
 
-    let teapot = Arc::new(Object::TriangleMesh(TriangleMesh::new(mesh, white.clone())));
+    for j in 0..5 {
+        for i in 0..5 {
+            let trans = glam::DVec3::new((i as f64) * 6.0, 1.0, (j as f64) * 6.0);
 
-    let rot = glam::DQuat::from_axis_angle(
-        Vec3::random_unit_vector().into(),
-        random_double(0.0, 2.0 * PI),
-    );
+            let rot = glam::DQuat::from_axis_angle(
+                Vec3::random_unit_vector().into(),
+                random_double(0.0, 2.0 * PI),
+            );
 
-    let mesh_mat = glam::DMat4::from_scale_rotation_translation(
-        glam::DVec3::ONE * 1.0,
-        rot,
-        glam::DVec3::new(0.0, 15.0, 0.0),
-    );
+            let teapot = Arc::new(Object::TriangleMesh(TriangleMesh::new(mesh.clone(), white.clone())));
 
-    world.add(Arc::new(Object::MatTransform(MatTransform::new(
-        mesh_mat,
-        teapot.clone(),
-    ))));
+            let mesh_mat = glam::DMat4::from_scale_rotation_translation(
+                glam::DVec3::ONE * 1.0,
+                rot,
+                trans,
+            );
+
+            world.add(Arc::new(Object::MatTransform(MatTransform::new(
+                mesh_mat,
+                teapot.clone(),
+            ))));
+        }
+    }
 
     let checker = Arc::new(Texture::CheckerTexture(CheckerTexture::from_colors(
         Color::new(0.2, 0.3, 0.1),
@@ -181,23 +187,57 @@ fn dragon_cornell() -> HittableList {
         0.73, 0.73, 0.73,
     ))));
 
-    let mesh_mat = glam::DMat4::from_scale_rotation_translation(
-        glam::DVec3::ONE * 25.0,
-        glam::DQuat::from_rotation_y(105_f64.to_radians()),
+    let glass = Arc::new(Material::Dielectric(Dielectric::new(1.5)));
+    let aluminum = Arc::new(Material::Metal(Metal::new(
+        Color::new(0.8, 0.85, 0.88),
+        0.4,
+    )));
+
+    let big_mat = glam::DMat4::from_scale_rotation_translation(
+        glam::DVec3::ONE * 55.0,
+        glam::DQuat::from_rotation_y(195_f64.to_radians()),
         glam::DVec3 {
-            x: 300.0,
-            y: 50.0,
-            z: 100.0,
+            x: 275.0,
+            y: 0.0,
+            z: 400.0,
         },
     );
 
-    // let mesh_mat = glam::DMat4::IDENTITY;
+    let glass_mat = glam::DMat4::from_scale_rotation_translation(
+        glam::DVec3::ONE * 30.0,
+        glam::DQuat::from_rotation_y(150_f64.to_radians()),
+        glam::DVec3 {
+            x: 150.0,
+            y: 0.0,
+            z: 200.0,
+        },
+    );
+
+    let alum_mat = glam::DMat4::from_scale_rotation_translation(
+        glam::DVec3::ONE * 30.0,
+        glam::DQuat::from_rotation_y(210_f64.to_radians()),
+        glam::DVec3 {
+            x: 400.0,
+            y: 0.0,
+            z: 200.0,
+        },
+    );
+
+    // let big_mat = glam::DMat4::IDENTITY;
 
     let mesh = Arc::new(Mesh::new("data/dragon.obj".into()));
 
-    let teapot = Object::TriangleMesh(TriangleMesh::new(mesh, white.clone()));
-    let mesh_scale = Object::MatTransform(MatTransform::new(mesh_mat, Arc::new(teapot)));
-    world.add(Arc::new(mesh_scale));
+    let big_dragon = Object::TriangleMesh(TriangleMesh::new(mesh.clone(), white.clone()));
+    let glass_dragon = Object::TriangleMesh(TriangleMesh::new(mesh.clone(), glass.clone()));
+    let alum_dragon = Object::TriangleMesh(TriangleMesh::new(mesh.clone(), aluminum.clone()));
+
+    let big_scale = Object::MatTransform(MatTransform::new(big_mat, Arc::new(big_dragon)));
+    let glass_scale = Object::MatTransform(MatTransform::new(glass_mat, Arc::new(glass_dragon)));
+    let alum_scale = Object::MatTransform(MatTransform::new(alum_mat, Arc::new(alum_dragon)));
+
+    world.add(Arc::new(big_scale));
+    world.add(Arc::new(glass_scale));
+    world.add(Arc::new(alum_scale));
 
     world
 }
